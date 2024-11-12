@@ -5,11 +5,15 @@ import base64
 import os
 import email
 from datetime import datetime
+import json
 
-def list_messages(service, user_id, label_ids=['INBOX'], max_results=10):
+
+def list_messages(service, user_id, label_ids=None, max_results=10):
     """
     List all Messages of the user's mailbox matching the query.
     """
+    if label_ids is None:
+        label_ids = ['INBOX']
     try:
         response = service.users().messages().list(
             userId=user_id,
@@ -21,6 +25,7 @@ def list_messages(service, user_id, label_ids=['INBOX'], max_results=10):
     except HttpError as error:
         print(f'An error occurred: {error}')
         return []
+
 
 def get_message_details(service, user_id, msg_id):
     """
@@ -38,38 +43,53 @@ def get_message_details(service, user_id, msg_id):
         date_str = header_dict.get('Date', '')
         timestamp = parse_date(date_str)
 
-        print(f"\n--- Email ID: {msg_id} ---")
-        print(f"Subject: {subject}")
-        print(f"From: {sender}")
-        print(f"To: {recipient}")
-        print(f"Date: {timestamp}")
+        # Get the email body
+        body = get_body(message['payload'])
 
-        # # Get the email body
-        # body = get_body(message['payload'])
-        # print(f"Body:\n{body}")
-        #
-        # # Handle attachments
-        # attachments = get_attachments(service, user_id, message)
-        # if attachments:
-        #     print(f"Attachments: {', '.join(attachments)}")
-        # else:
-        #     print("No attachments found.")
+        # Handle attachments
+        attachments = get_attachments(service, user_id, message)
 
-        return message
+        email_details = {
+            "Email ID": msg_id,
+            "Subject": subject,
+            "From": sender,
+            "To": recipient,
+            "Date": timestamp,  # Original timestamp with time
+            "Body": body,
+            "Attachments": attachments if attachments else []
+        }
+
+        return email_details
 
     except HttpError as error:
         print(f'An error occurred: {error}')
         return None
 
+
 def parse_date(date_str):
     """
-    Parse the date string from the email headers and return a formatted timestamp.
+    Parse the date string from the email headers and return a datetime object.
     """
     try:
         parsed_date = email.utils.parsedate_to_datetime(date_str)
-        return parsed_date.strftime('%Y-%m-%d %H:%M:%S')
+        return parsed_date
     except Exception:
-        return date_str
+        return None
+
+
+def format_date_key(dt):
+    """
+    Format a datetime object into a string like 'Tuesday, 12 November 2024'.
+    """
+    if not dt:
+        return "Unknown Date"
+
+    day_name = dt.strftime('%A')
+    day = dt.day  # Removed ordinal suffix
+    month = dt.strftime('%B')
+    year = dt.year
+    return f"{day_name}, {day} {month} {year}"
+
 
 def get_body(payload):
     """
@@ -91,6 +111,7 @@ def get_body(payload):
             return base64.urlsafe_b64decode(data).decode('utf-8')
     return "No body found."
 
+
 def get_attachments(service, user_id, message, store_dir='attachments'):
     """
     Download all attachments from the email and save them to the specified directory.
@@ -102,33 +123,82 @@ def get_attachments(service, user_id, message, store_dir='attachments'):
 
     parts = message['payload'].get('parts', [])
     for part in parts:
-        if part['filename']:
+        if part.get('filename'):
             attachment_id = part['body'].get('attachmentId')
             if attachment_id:
-                attachment = service.users().messages().attachments().get(
-                    userId=user_id,
-                    messageId=message['id'],
-                    id=attachment_id
-                ).execute()
-                file_data = base64.urlsafe_b64decode(attachment['data'].encode('UTF-8'))
-                path = os.path.join(store_dir, part['filename'])
+                try:
+                    attachment = service.users().messages().attachments().get(
+                        userId=user_id,
+                        messageId=message['id'],
+                        id=attachment_id
+                    ).execute()
+                    file_data = base64.urlsafe_b64decode(attachment['data'].encode('UTF-8'))
+                    path = os.path.join(store_dir, part['filename'])
 
-                with open(path, 'wb') as f:
-                    f.write(file_data)
-                attachments.append(part['filename'])
+                    with open(path, 'wb') as f:
+                        f.write(file_data)
+                    attachments.append(part['filename'])
+                except HttpError as error:
+                    print(f'An error occurred while downloading attachment: {error}')
     return attachments
+
 
 def main():
     service = build('gmail', 'v1', credentials=gmail_authenticate())
     user_id = 'me'
-    messages = list_messages(service, user_id, max_results=10)
+    messages = list_messages(service, user_id, max_results=100)
 
     if not messages:
         print("No messages found.")
     else:
-        print(f"Found {len(messages)} messages. Fetching details...\n")
+        print(f"Found {len(messages)} messages. Fetching details...")
+        grouped_emails = {}
+
         for message in messages:
-            get_message_details(service, user_id, message['id'])
+            details = get_message_details(service, user_id, message['id'])
+            if details:
+                # Parse the date string back to datetime object
+                if details['Date']:
+                    date_tag = details['Date']
+                    dt = date_tag if isinstance(date_tag, datetime) else datetime.strptime(details['Date'], '%d-%b-%Y at %H:%M')
+                else:
+                    dt = None
+
+                # Format the date key
+                date_key = format_date_key(dt)
+
+                # Initialize the list for the date if not already
+                if date_key not in grouped_emails:
+                    grouped_emails[date_key] = []
+
+                # Append the email details to the corresponding date
+                grouped_emails[date_key].append(details)
+
+        # Optionally, sort the grouped_emails by date
+        # Convert the keys back to datetime objects for sorting
+        def sort_key(item):
+            date_str = item[0]
+            try:
+                return email.utils.parsedate_to_datetime(date_str)
+            except ValueError:
+                return datetime.min
+
+        # Sorting the dictionary by date
+        sorted_grouped_emails = dict(sorted(
+            grouped_emails.items(),
+            key=sort_key,
+            reverse=True  # Most recent first
+        ))
+
+        # Write to JSON file
+        output_file = 'email_results.json'
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(sorted_grouped_emails, f, ensure_ascii=False, indent=4, default=str)
+            print(f"Email details have been written to {output_file}")
+        except IOError as e:
+            print(f"An error occurred while writing to the file: {e}")
+
 
 if __name__ == '__main__':
     main()
