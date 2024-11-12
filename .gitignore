@@ -4,3 +4,5 @@
 /source/core_scrapper/*.ipynb
 /userdata
 *.tmp
+/source/gmail_analysis/*.json
+*.pickle
