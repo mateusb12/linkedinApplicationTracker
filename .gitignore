@@ -2,3 +2,5 @@
 .idea/
 /source/core_scrapper/*.json
 /source/core_scrapper/*.ipynb
+/userdata
+*.tmp

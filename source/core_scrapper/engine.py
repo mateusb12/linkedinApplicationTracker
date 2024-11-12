@@ -1,3 +1,4 @@
+from boltons.iterutils import first
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -5,11 +6,13 @@ from source.core_scrapper.selenium_utils import open_chrome, export_cookies
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
+
 class CoreScrapper:
     def __init__(self, driver: webdriver.Chrome = None):
         self.driver = driver if driver else open_chrome()
+        self.current_page = 1
         self.driver.get("https://www.linkedin.com/my-items/saved-jobs/?cardType=APPLIED")
-        self.collect_data_from_current_page()
+        # self.collect_data_from_current_page()
         return
 
     def save_cookies(self):
@@ -43,16 +46,25 @@ class CoreScrapper:
             except Exception as e:
                 print(f"Error in container {index + 1}: {e}")
 
-    # def __del__(self):
-    #     try:
-    #         self.save_cookies()
-    #     finally:
-    #         if self.driver:
-    #             self.driver.quit()
+    def browse_next_page(self):
+        next_page_tag = (self.current_page - 1) * 10
+        next_page_url = f"https://www.linkedin.com/my-items/saved-jobs/?cardType=APPLIED&page={next_page_tag}"
+        self.driver.get(next_page_url)
+        self.collect_data_from_current_page()
+        self.current_page += 1
+
+    def __del__(self):
+        try:
+            self.save_cookies()
+        finally:
+            if self.driver:
+                self.driver.quit()
+
 
 def main():
     core_scrapper = CoreScrapper()
     print("Done!")
+
 
 if __name__ == '__main__':
     main()
