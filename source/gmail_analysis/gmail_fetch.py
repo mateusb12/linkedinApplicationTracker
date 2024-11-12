@@ -6,21 +6,35 @@ import os
 import email
 from datetime import datetime
 import json
+import time  # Added for tracking time
 
 
-def list_messages(service, user_id, label_ids=None, max_results=10):
+def list_messages(service, user_id, label_ids=None, max_results=1000):
     """
-    List all Messages of the user's mailbox matching the query.
+    List all Messages of the user's mailbox matching the query with pagination.
     """
     if label_ids is None:
         label_ids = ['INBOX']
+    messages = []
     try:
         response = service.users().messages().list(
             userId=user_id,
             labelIds=label_ids,
             maxResults=max_results
         ).execute()
-        messages = response.get('messages', [])
+        messages.extend(response.get('messages', []))
+
+        # Implementing pagination
+        while 'nextPageToken' in response and len(messages) < max_results:
+            page_token = response['nextPageToken']
+            response = service.users().messages().list(
+                userId=user_id,
+                labelIds=label_ids,
+                maxResults=max_results - len(messages),  # Adjust maxResults to fetch the remaining messages
+                pageToken=page_token
+            ).execute()
+            messages.extend(response.get('messages', []))
+
         return messages
     except HttpError as error:
         print(f'An error occurred: {error}')
@@ -135,45 +149,77 @@ def get_attachments(service, user_id, message, store_dir='attachments'):
                     file_data = base64.urlsafe_b64decode(attachment['data'].encode('UTF-8'))
                     path = os.path.join(store_dir, part['filename'])
 
+                    # Ensure the directory exists
+                    path_dir = os.path.dirname(path)
+                    if not os.path.exists(path_dir):
+                        os.makedirs(path_dir)
+
                     with open(path, 'wb') as f:
                         f.write(file_data)
                     attachments.append(part['filename'])
                 except HttpError as error:
                     print(f'An error occurred while downloading attachment: {error}')
+                except Exception as e:
+                    print(f'An error occurred while saving attachment {part["filename"]}: {e}')
     return attachments
 
 
 def main():
     service = build('gmail', 'v1', credentials=gmail_authenticate())
     user_id = 'me'
-    messages = list_messages(service, user_id, max_results=1000)
+    messages = list_messages(service, user_id, max_results=3000)
 
     if not messages:
         print("No messages found.")
     else:
         print(f"Found {len(messages)} messages. Fetching details...")
         grouped_emails = {}
+        start_time = time.time()  # Start time for progress tracking
 
         for index, message in enumerate(messages, 1):
-            print(f"Processing message {index} of {len(messages)}")
-            details = get_message_details(service, user_id, message['id'])
-            if details:
-                # Parse the date string back to datetime object
-                if details['Date']:
-                    date_tag = details['Date']
-                    dt = date_tag if isinstance(date_tag, datetime) else datetime.strptime(details['Date'], '%d-%b-%Y at %H:%M')
+            try:
+                details = get_message_details(service, user_id, message['id'])
+                if details:
+                    # Parse the date string back to datetime object
+                    if details['Date']:
+                        date_tag = details['Date']
+                        dt = date_tag if isinstance(date_tag, datetime) else datetime.strptime(details['Date'], '%d-%b-%Y at %H:%M')
+                    else:
+                        dt = None
+
+                    # Format the date key
+                    date_key = format_date_key(dt)
+
+                    # Initialize the list for the date if not already
+                    if date_key not in grouped_emails:
+                        grouped_emails[date_key] = []
+
+                    # Append the email details to the corresponding date
+                    grouped_emails[date_key].append(details)
+
+                # Progress tracking
+                current_time = time.time()
+                elapsed_time = current_time - start_time
+                emails_processed = index
+                total_emails = len(messages)
+                remaining_emails = total_emails - emails_processed
+
+                if elapsed_time > 0:
+                    current_speed = emails_processed / elapsed_time  # emails per second
+                    remaining_time_sec = remaining_emails / current_speed
+                    remaining_time_formatted = time.strftime('%Hh %Mm %Ss', time.gmtime(remaining_time_sec))
+                    eta_timestamp = current_time + remaining_time_sec
+                    eta_formatted = time.strftime('%H:%M', time.localtime(eta_timestamp))
                 else:
-                    dt = None
+                    current_speed = 0
+                    remaining_time_formatted = 'calculating...'
+                    eta_formatted = 'calculating...'
 
-                # Format the date key
-                date_key = format_date_key(dt)
+                print(f"Processed {emails_processed}/{total_emails} emails | Current speed: {current_speed:.2f} emails/sec | Remaining emails: {remaining_emails} | Remaining time: {remaining_time_formatted} | ETA: {eta_formatted}")
 
-                # Initialize the list for the date if not already
-                if date_key not in grouped_emails:
-                    grouped_emails[date_key] = []
-
-                # Append the email details to the corresponding date
-                grouped_emails[date_key].append(details)
+            except Exception as e:
+                print(f"An error occurred while processing message {index}: {e}")
+                continue  # Skip to the next message
 
         # Optionally, sort the grouped_emails by date
         # Convert the keys back to datetime objects for sorting
