@@ -146,7 +146,7 @@ def get_attachments(service, user_id, message, store_dir='attachments'):
 def main():
     service = build('gmail', 'v1', credentials=gmail_authenticate())
     user_id = 'me'
-    messages = list_messages(service, user_id, max_results=100)
+    messages = list_messages(service, user_id, max_results=1000)
 
     if not messages:
         print("No messages found.")
@@ -154,7 +154,8 @@ def main():
         print(f"Found {len(messages)} messages. Fetching details...")
         grouped_emails = {}
 
-        for message in messages:
+        for index, message in enumerate(messages, 1):
+            print(f"Processing message {index} of {len(messages)}")
             details = get_message_details(service, user_id, message['id'])
             if details:
                 # Parse the date string back to datetime object
