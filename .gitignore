@@ -1,2 +1,4 @@
 /project_utils/commit_changes_generator/commit_changes.diff
 .idea/
+/source/core_scrapper/*.json
+/source/core_scrapper/*.ipynb
