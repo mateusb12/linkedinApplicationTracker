@@ -38,14 +38,21 @@ LinkedIn Application Tracker is a Python project that helps you monitor your Lin
 1. Go to the Google Cloud Console.
 2. Create a new project or select an existing one.
 3. Enable the Gmail API for your project.
+![Gmail API](pictures/1.png)
 4. Create OAuth 2.0 credentials:
 
 - Go to APIs & Services > Credentials.
 - Click Create Credentials and select OAuth client ID.
+![Create Credentials](pictures/2.png)
+![Oauth client ID](pictures/3.png)
 - Choose Desktop app as the application type.
-- Download the credentials.json file.
+![Config](pictures/4.png)
+- Download the credentials.json file and place it in the gmail directory
 
-Place the credentials.json file in the project root directory.
+![JSON](pictures/5.png)
+
+5. Setup yourself as tester of your OAuth 2.0 App
+![OAuth](pictures/6.png)
 
 ### Running the script
 1. Authenticate with Gmail
