@@ -204,6 +204,8 @@ def plot_data(x_labels, y_values, is_date, x_formatter, x_locator, x_rotation, b
 def main():
     filename = 'email_results.json'
     data = load_data(filename)
+
+
     application_counts = count_applications(data)
 
     if not application_counts:
