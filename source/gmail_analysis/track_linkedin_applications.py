@@ -3,6 +3,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 import sys
 
 
@@ -65,18 +66,50 @@ def aggregate_counts(application_counts):
 
     return {
         'day': application_counts,
-        'week': week_counts,        # Added weekly aggregation
+        'week': week_counts,
         'month': month_counts,
         'quarter': quarter_counts,
         'year': year_counts
     }
 
 
+def week_of_month(date):
+    """Return the week number within the month for the specified date."""
+    first_day = date.replace(day=1)
+    dom = date.day
+    adjusted_dom = dom + first_day.weekday()
+    week_number = int((adjusted_dom - 1) / 7)
+    return week_number
+
+
+
+def custom_week_formatter(x, pos=None):
+    """
+    Custom formatter for week labels.
+    Formats as 'Week X\nMonth\nYear', e.g., 'Week 3\nAugust\n2024'.
+    """
+    if isinstance(x, datetime):
+        week_num = week_of_month(x)
+        month_name = x.strftime('%B')
+        year = x.strftime('%Y')
+        return f'Semana {week_num}\n{month_name}\n{year}'
+    else:
+        # If x is a float (matplotlib internal), convert it to datetime
+        try:
+            date = mdates.num2date(x)
+            week_num = week_of_month(date)
+            month_name = date.strftime('%B')
+            year = date.strftime('%Y')
+            return f'Semana {week_num}\n{month_name}\n{year}'
+        except Exception:
+            return ''
+
+
 def determine_plot_data(counts_dicts, max_points):
     """Determine the appropriate aggregation level for plotting."""
     aggregation_levels = [
         ('day', counts_dicts['day'], mdates.DateFormatter('%d/%b'), mdates.DayLocator(), 45),
-        ('week', counts_dicts['week'], mdates.DateFormatter('Week %W\n%Y'), mdates.WeekdayLocator(byweekday=mdates.MO), 0),  # Added week
+        ('week', counts_dicts['week'], custom_week_formatter, mdates.WeekdayLocator(byweekday=mdates.MO), 0),
         ('month', counts_dicts['month'], mdates.DateFormatter('%b %Y'), mdates.MonthLocator(), 0),
         ('quarter', counts_dicts['quarter'], None, None, 0),
         ('year', counts_dicts['year'], None, None, 0),
@@ -103,7 +136,7 @@ def plot_data(x_labels, y_values, is_date, x_formatter, x_locator, x_rotation, b
     - x_labels: List of dates or categorical labels.
     - y_values: Corresponding counts.
     - is_date: Boolean indicating if x_labels are datetime objects.
-    - x_formatter: DateFormatter for the x-axis.
+    - x_formatter: DateFormatter or custom formatter for the x-axis.
     - x_locator: Locator for the x-axis.
     - x_rotation: Rotation angle for x-axis labels.
     - bar_width: Width of the bars (default is 0.8).
@@ -117,19 +150,23 @@ def plot_data(x_labels, y_values, is_date, x_formatter, x_locator, x_rotation, b
         # Calculate appropriate bar width based on the data frequency
         if isinstance(x_locator, mdates.DayLocator):
             # For daily data, set width as 0.8 days
-            width = timedelta(days=0.8)
+            width = 0.6  # in days
         elif isinstance(x_locator, mdates.WeekdayLocator):
             # For weekly data, set width as 5 days (Monday to Friday)
-            width = timedelta(days=5)
+            width = 4  # in days
         elif isinstance(x_locator, mdates.MonthLocator):
-            # For monthly data, set width as 15 days
-            width = timedelta(days=15)
+            # For monthly data, set width as ~15 days
+            width = 14  # in days
         else:
             # Default width for other cases
-            width = timedelta(days=10)
+            width = 10  # in days
 
         ax.bar(x_labels, y_values, width=width, edgecolor='black', zorder=1, align='center')
-        if x_formatter:
+
+        if callable(x_formatter):
+            # Use a custom formatter function
+            ax.xaxis.set_major_formatter(ticker.FuncFormatter(x_formatter))
+        elif x_formatter:
             ax.xaxis.set_major_formatter(x_formatter)
         if x_locator:
             ax.xaxis.set_major_locator(x_locator)
@@ -174,7 +211,7 @@ def main():
         sys.exit(0)
 
     counts_dicts = aggregate_counts(application_counts)
-    max_points = 5  # Maximum number of data points on the x-axis
+    max_points = 10  # Maximum number of data points on the x-axis
 
     x_labels, y_values, is_date, x_formatter, x_locator, x_rotation = determine_plot_data(counts_dicts, max_points)
 
