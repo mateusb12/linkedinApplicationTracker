@@ -167,7 +167,7 @@ def get_attachments(service, user_id, message, store_dir='attachments'):
 def main():
     service = build('gmail', 'v1', credentials=gmail_authenticate())
     user_id = 'me'
-    messages = list_messages(service, user_id, max_results=3000)
+    messages = list_messages(service, user_id, max_results=500)
 
     if not messages:
         print("No messages found.")
