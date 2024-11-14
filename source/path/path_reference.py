@@ -13,6 +13,14 @@ def get_scrapper_folder_path() -> Path:
     return Path(get_source_folder_path(), 'core_scrapper')
 
 
+def get_gmail_folder_path() -> Path:
+    return Path(get_source_folder_path(), 'gmail_analysis')
+
+
+def get_credentials_path() -> Path:
+    return Path(get_gmail_folder_path(), 'credentials.json')
+
+
 def main():
     folder = get_scrapper_folder_path()
     print(folder)

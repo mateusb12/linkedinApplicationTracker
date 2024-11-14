@@ -49,6 +49,9 @@ LinkedIn Application Tracker is a Python project that helps you monitor your Lin
 ![Config](pictures/4.png)
 - Download the credentials.json file and place it in the gmail directory
 
+
+
+
 ![JSON](pictures/5.png)
 
 5. Setup yourself as tester of your OAuth 2.0 App

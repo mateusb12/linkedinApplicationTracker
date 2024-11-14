@@ -3,6 +3,8 @@ from google.auth.transport.requests import Request
 import os
 import pickle
 
+from source.path.path_reference import get_credentials_path
+
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
@@ -20,8 +22,9 @@ def gmail_authenticate():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
+            credentials_path = str(get_credentials_path())
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES,
+                credentials_path, SCOPES,
                 redirect_uri='http://localhost:8080/callback')
             creds = flow.run_local_server(port=8080)
         # Save the credentials for the next run
