@@ -10,6 +10,8 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Replace with your secret key
 app.config['SERVER_NAME'] = 'localhost:8080'
 
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 CLIENT_SECRETS_FILE = get_credentials_path()
 
