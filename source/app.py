@@ -1,9 +1,12 @@
-from flask import Flask, render_template, redirect, url_for, request, session
+#app.py
+
+from flask import Flask, render_template, redirect, url_for, request, session, Response
 
 from google_auth_oauthlib.flow import Flow
 import os
 import pickle
 
+from source.gmail_analysis.gmail_fetch import fetch_emails_generator
 from source.path.path_reference import get_credentials_path
 
 app = Flask(__name__)
@@ -48,6 +51,13 @@ def oauth2callback():
         pickle.dump(creds, token)
 
     return redirect(url_for('index'))
+
+@app.route('/fetch_emails')
+def fetch_emails():
+    def generate():
+        for progress in fetch_emails_generator():
+            yield f"data: {progress}\n\n"
+    return Response(generate(), mimetype='text/event-stream')
 
 
 if __name__ == '__main__':

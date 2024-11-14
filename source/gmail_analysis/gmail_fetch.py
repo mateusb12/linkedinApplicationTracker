@@ -1,3 +1,5 @@
+#gmail_fetch.py
+
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from source.gmail_analysis.gmail_auth import gmail_authenticate
@@ -164,15 +166,16 @@ def get_attachments(service, user_id, message, store_dir='attachments'):
     return attachments
 
 
-def main():
+def fetch_emails_generator():
     service = build('gmail', 'v1', credentials=gmail_authenticate())
     user_id = 'me'
     messages = list_messages(service, user_id, max_results=100)
 
     if not messages:
-        print("No messages found.")
+        yield json.dumps({"message": "No messages found."})
     else:
-        print(f"Found {len(messages)} messages. Fetching details...")
+        total_messages = len(messages)
+        yield json.dumps({"message": f"Found {total_messages} messages. Fetching details..."})
         grouped_emails = {}
         start_time = time.time()  # Start time for progress tracking
 
@@ -201,10 +204,9 @@ def main():
                 current_time = time.time()
                 elapsed_time = current_time - start_time
                 emails_processed = index
-                total_emails = len(messages)
-                remaining_emails = total_emails - emails_processed
+                remaining_emails = total_messages - emails_processed
 
-                if elapsed_time > 0:
+                if elapsed_time > 0 and emails_processed > 0:
                     current_speed = emails_processed / elapsed_time  # emails per second
                     remaining_time_sec = remaining_emails / current_speed
                     remaining_time_formatted = time.strftime('%Hh %Mm %Ss', time.gmtime(remaining_time_sec))
@@ -215,11 +217,24 @@ def main():
                     remaining_time_formatted = 'calculating...'
                     eta_formatted = 'calculating...'
 
-                print(f"Processed {emails_processed}/{total_emails} emails | Current speed: {current_speed:.2f} emails/sec | Remaining emails: {remaining_emails} | Remaining time: {remaining_time_formatted} | ETA: {eta_formatted}")
+                progress_data = {
+                    'emails_processed': emails_processed,
+                    'total_emails': total_messages,
+                    'current_speed': current_speed,
+                    'remaining_emails': remaining_emails,
+                    'remaining_time_formatted': remaining_time_formatted,
+                    'eta_formatted': eta_formatted
+                }
+
+                yield json.dumps(progress_data)
+
+                # print(f"Processed {emails_processed}/{total_emails} emails | Current speed: {current_speed:.2f} emails/sec | Remaining emails: {remaining_emails} | Remaining time: {remaining_time_formatted} | ETA: {eta_formatted}")
 
             except Exception as e:
-                print(f"An error occurred while processing message {index}: {e}")
+                yield json.dumps({"error": f"An error occurred while processing message {index}: {e}"})
                 continue  # Skip to the next message
+
+        yield json.dumps({"message": "Email fetching completed."})
 
         # Optionally, sort the grouped_emails by date
         # Convert the keys back to datetime objects for sorting
@@ -245,6 +260,10 @@ def main():
             print(f"Email details have been written to {output_file}")
         except IOError as e:
             print(f"An error occurred while writing to the file: {e}")
+
+
+def main():
+    fetch_emails_generator()
 
 
 if __name__ == '__main__':
