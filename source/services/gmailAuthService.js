@@ -18,10 +18,8 @@ class GmailAuthService {
             if (fs.existsSync(CREDENTIALS_PATH)) {
                 const content = fs.readFileSync(CREDENTIALS_PATH);
                 this.credentials = JSON.parse(content);
-                console.log('Loaded credentials from:', CREDENTIALS_PATH);
                 
                 const { client_secret, client_id, redirect_uris } = this.credentials.installed || this.credentials.web;
-                console.log('Redirect URIs from credentials:', redirect_uris);
                 
                 this.oAuth2Client = new google.auth.OAuth2(
                     client_id, client_secret, redirect_uris[0]

@@ -12,3 +12,5 @@
 /project_utils/project_structure_generator/directory_structure.json
 /source/secrets/credentials.json
 /source/tokens/token.json
+/source/attachments/
+/source/data/email_results.json
