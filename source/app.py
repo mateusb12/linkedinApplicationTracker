@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import Flow
 import os
 import pickle
 
+from source.gmail_analysis.gmail_auth import gmail_authenticate
 from source.gmail_analysis.gmail_fetch import fetch_emails_generator
 from source.path.path_reference import get_credentials_path
 

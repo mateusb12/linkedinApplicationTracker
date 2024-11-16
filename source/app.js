@@ -25,12 +25,15 @@ app.use(session({
 
 // OAuth2 setup
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const CLIENT_SECRETS_FILE = path.join(__dirname, 'credentials.json'); // Update path as needed
+const CLIENT_SECRETS_FILE = path.join(__dirname, 'gmail_analysis/credentials.json'); // Update path as needed
+
+const credentials = JSON.parse(fs.readFileSync(CLIENT_SECRETS_FILE));
+const { client_secret, client_id, redirect_uris } = credentials.web;
 
 const oauth2Client = new google.auth.OAuth2(
-    process.env.CLIENT_ID,
-    process.env.CLIENT_SECRET,
-    'http://localhost:8080/oauth2callback'
+    client_id,
+    client_secret,
+    'http://localhost:8080/oauth2callback' // Explicitly set redirect URI
 );
 
 // Routes
@@ -40,18 +43,23 @@ app.get('/', (req, res) => {
 });
 
 app.get('/call_function', (req, res) => {
+    const state = Math.random().toString(36).substring(7);
+    req.session.state = state;
     const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
-        include_granted_scopes: true
+        include_granted_scopes: true,
+        state: state // Use the same state
     });
-    
-    req.session.state = Math.random().toString(36).substring(7);
     res.redirect(authUrl);
 });
 
 app.get('/oauth2callback', async (req, res) => {
-    const { code } = req.query;
+    const { code, state } = req.query;
+
+    if (state !== req.session.state) {
+        return res.status(400).send('Invalid state parameter');
+    }
     
     try {
         const { tokens } = await oauth2Client.getToken(code);
