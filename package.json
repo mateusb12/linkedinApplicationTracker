@@ -1,0 +1,10 @@
+{
+    "name": "gmail-analyzer",
+    "version": "1.0.0",
+    "dependencies": {
+      "express": "^4.18.2",
+      "express-session": "^1.17.3",
+      "googleapis": "^126.0.1",
+      "ejs": "^3.1.9"
+    }
+  }

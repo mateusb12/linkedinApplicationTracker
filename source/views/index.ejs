@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gmail Analyzer</title>
+      <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #0077b5; /* LinkedIn blue */
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        main {
+            padding: 20px;
+        }
+
+        section {
+            background-color: white;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        section h2 {
+            margin-top: 0;
+        }
+
+        button {
+            background-color: #0077b5;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #005f8c;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+        }
+
+        #chart-placeholder {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #chart-placeholder img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ccc;
+        }
+
+        footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 10px;
+        }
+
+        footer a {
+            color: #0077b5;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .border-container {
+            border: 1px solid black;
+        }
+
+        #authentication {
+            text-align: left;
+        }
+
+        #progress-bar {
+            width: 100%;
+            height: 20px;
+            display: none;
+            margin-top: 10px;
+            -webkit-appearance: none;
+            appearance: none;
+            border: 1px black solid;
+        }
+
+        #progress-bar::-webkit-progress-bar {
+            background-color: #f4f4f4; /* Background color for the progress bar container */
+            border-radius: 5px;
+        }
+
+        #progress-bar::-webkit-progress-value {
+            background-color: #0077b5; /* LinkedIn blue for the progress value */
+            border-radius: 5px;
+        }
+
+        #progress-bar::-moz-progress-bar {
+            background-color: #09F7A5; /* LinkedIn blue for Firefox */
+            border-radius: 5px;
+        }
+
+        .progress-data {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .progress-data div {
+            font-size: 14px;
+        }
+
+        .progress-data span.label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <main>
+    <section id="authentication" class="border-container">
+        <h2>Gmail Authentication</h2>
+        <p>Authenticate with your Gmail account to start tracking your LinkedIn job applications.</p>
+        <% if (!authenticated) { %>
+            <button id="auth-button" onclick="window.location.href='/call_function'">Authenticate with Gmail</button>
+        <% } else { %>
+            <p style="color: green;">Authenticated with Gmail!</p>
+        <% } %>
+    </section>
+
+    <section id="fetch-emails" class="border-container">
+        <h2>Fetch Emails</h2>
+        <p>After authentication, fetch your latest job application emails.</p>
+        <button id="fetch-button"
+                onclick="fetchEmails()"
+                <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"<% } %>>
+            Fetch Emails
+        </button>
+        <progress id="progress-bar" value="0" max="100"></progress>
+
+        <div class="progress-data" style="display: none;">
+            <div><span class="label">Emails Processed:</span> <span id="emails-processed">0</span></div>
+            <div><span class="label">Total Emails:</span> <span id="total-emails">0</span></div>
+            <div><span class="label">Current Speed (emails/sec):</span> <span id="current-speed">0</span></div>
+            <div><span class="label">Remaining Emails:</span> <span id="remaining-emails">0</span></div>
+            <div><span class="label">Remaining Time:</span> <span id="remaining-time">Calculating...</span></div>
+            <div><span class="label">ETA:</span> <span id="eta">Calculating...</span></div>
+        </div>
+
+        <% if (!authenticated) { %>
+            <p style="color: red;">Please authenticate first to fetch your emails.</p>
+        <% } %>
+    </section>
+
+    <section id="application-tracking" class="border-container">
+        <h2>Application Tracking</h2>
+        <p>View your job application statistics over time.</p>
+        <div id="chart-placeholder">
+            <img src="static/dummy_chart.png" alt="Application Chart">
+        </div>
+    </section>
+</main>
+<footer>
+    <p>Developed by <a href="https://mateusb12.github.io/mateus_portfolio/">Mateus</a></p>
+</footer>
+<script>
+    function fetchEmails() {
+        document.querySelector('.progress-data').style.display = 'block';
+        const progressBar = document.getElementById('progress-bar');
+        const fetchButton = document.getElementById('fetch-button');
+        const emailsProcessed = document.getElementById('emails-processed');
+        const totalEmails = document.getElementById('total-emails');
+        const currentSpeed = document.getElementById('current-speed');
+        const remainingEmails = document.getElementById('remaining-emails');
+        const remainingTime = document.getElementById('remaining-time');
+        const eta = document.getElementById('eta');
+
+        progressBar.style.display = 'block';
+        fetchButton.disabled = true;
+        fetchButton.style.backgroundColor = 'grey';
+
+        // Reset previous data
+        emailsProcessed.textContent = '0';
+        totalEmails.textContent = '0';
+        currentSpeed.textContent = '0';
+        remainingEmails.textContent = '0';
+        remainingTime.textContent = 'Calculating...';
+        eta.textContent = 'Calculating...';
+
+        const eventSource = new EventSource('/fetch_emails');
+
+        eventSource.onmessage = function (e) {
+            try {
+                const data = JSON.parse(e.data);
+
+                if (data.emails_processed !== undefined && data.total_emails !== undefined) {
+                    const processed = data.emails_processed;
+                    const total = data.total_emails;
+                    const percentage = (processed / total) * 100;
+                    progressBar.value = percentage;
+
+                    // Update progress data
+                    emailsProcessed.textContent = processed;
+                    totalEmails.textContent = total;
+                    currentSpeed.textContent = data.current_speed.toFixed(2);
+                    remainingEmails.textContent = data.remaining_emails;
+                    remainingTime.textContent = data.remaining_time_formatted;
+                    eta.textContent = data.eta_formatted;
+                }
+
+                if (data.message) {
+                    console.log(data.message);
+                    if (data.message === "Email fetching completed.") {
+                        eventSource.close();
+                        fetchButton.disabled = false;
+                        fetchButton.style.backgroundColor = '#0077b5';
+                        alert('Emails fetched successfully!');
+                    }
+                }
+
+                if (data.error) {
+                    console.error(data.error);
+                    alert(`Error: ${data.error}`);
+                    eventSource.close();
+                    fetchButton.disabled = false;
+                    fetchButton.style.backgroundColor = '#0077b5';
+                }
+            } catch (error) {
+                console.error('Error parsing data:', error);
+            }
+        };
+
+        eventSource.onerror = function (e) {
+            console.error('EventSource failed.', e);
+            eventSource.close();
+            fetchButton.disabled = false;
+            fetchButton.style.backgroundColor = '#0077b5';
+            alert('An error occurred while fetching emails.');
+        };
+    }
+</script>
+</body>
+</html>

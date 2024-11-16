@@ -7,3 +7,5 @@
 /source/gmail_analysis/*.json
 *.pickle
 /source/gmail_analysis/attachments/
+/source/email_results.json
+/.env
