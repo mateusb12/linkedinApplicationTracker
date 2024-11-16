@@ -3,15 +3,20 @@ const session = require('express-session');
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
+const favicon = require('serve-favicon');
 
 const app = express();
 const port = 8080;
 
 // Middleware setup
 app.set('views', path.join(__dirname, 'views'));
+app.use(favicon(path.join(__dirname, '../public/images/email.png')));
+app.use(express.static(path.join(__dirname, '../public')));
+app.set('view engine', 'ejs'); // Using EJS as template engine
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.set('view engine', 'ejs'); // Using EJS as template engine
+
 app.use(session({
     secret: 'your_secret_key',
     resave: false,

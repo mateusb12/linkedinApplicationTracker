@@ -2,7 +2,10 @@
 <html>
 <head>
     <title>Gmail Analyzer</title>
-      <style>
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/email.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/email.png">
+    <link rel="shortcut icon" href="/images/email.png">
+    <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -130,7 +133,7 @@
     </style>
 </head>
 <body>
-    <main>
+<main>
     <section id="authentication" class="border-container">
         <h2>Gmail Authentication</h2>
         <p>Authenticate with your Gmail account to start tracking your LinkedIn job applications.</p>
@@ -146,7 +149,9 @@
         <p>After authentication, fetch your latest job application emails.</p>
         <button id="fetch-button"
                 onclick="fetchEmails()"
-                <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"<% } %>>
+                <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"
+                <% } %>
+        >
             Fetch Emails
         </button>
         <progress id="progress-bar" value="0" max="100"></progress>
