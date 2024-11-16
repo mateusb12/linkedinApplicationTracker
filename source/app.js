@@ -42,7 +42,7 @@ app.get('/', (req, res) => {
     res.render('index', { authenticated });
 });
 
-app.get('/call_function', (req, res) => {
+app.get('/gmail_auth', (req, res) => {
     const state = Math.random().toString(36).substring(7);
     req.session.state = state;
     const authUrl = oauth2Client.generateAuthUrl({
