@@ -4,7 +4,7 @@ const authService = require('./gmailAuthService');
 class GmailFetchService {
     async* fetchEmailsGenerator() {
         try {
-            const auth = authService.getAuthClient();
+            const auth = authService.getOAuth2Client();
             const gmail = google.gmail({ version: 'v1', auth });
 
             // First, get total count of emails
@@ -42,10 +42,10 @@ class GmailFetchService {
                 yield JSON.stringify({
                     emails_processed: processed,
                     total_emails: totalEmails,
-                    current_speed: currentSpeed,
-                    remaining_emails: remainingEmails,
-                    remaining_time_formatted: remainingTime,
-                    eta_formatted: eta,
+                    current_speed: currentSpeed || 0,
+                    remaining_emails: remainingEmails || 0,
+                    remaining_time_formatted: remainingTime || 'Calculating...',
+                    eta_formatted: eta || 'Calculating...',
                     message: 'Processing emails...'
                 });
             }

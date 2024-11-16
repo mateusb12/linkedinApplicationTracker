@@ -217,13 +217,13 @@
                     const percentage = (processed / total) * 100;
                     progressBar.value = percentage;
 
-                    // Update progress data
+                    // Update progress data with null checks
                     emailsProcessed.textContent = processed;
                     totalEmails.textContent = total;
-                    currentSpeed.textContent = data.current_speed.toFixed(2);
-                    remainingEmails.textContent = data.remaining_emails;
-                    remainingTime.textContent = data.remaining_time_formatted;
-                    eta.textContent = data.eta_formatted;
+                    currentSpeed.textContent = data.current_speed ? data.current_speed.toFixed(2) : '0';
+                    remainingEmails.textContent = data.remaining_emails || '0';
+                    remainingTime.textContent = data.remaining_time_formatted || 'Calculating...';
+                    eta.textContent = data.eta_formatted || 'Calculating...';
                 }
 
                 if (data.message) {
