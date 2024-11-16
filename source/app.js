@@ -3,7 +3,7 @@ const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
 const favicon = require('serve-favicon');
-const authService = require('./services/authService');
+const authService = require('./services/gmailAuthService');
 
 const app = express();
 const port = 8080;
@@ -30,13 +30,19 @@ app.get('/', (req, res) => {
 });
 
 app.get('/auth/gmail', (req, res) => {
+    console.log('Starting auth process...');
     const state = Math.random().toString(36).substring(7);
     const authUrl = authService.generateAuthUrl(state);
+    console.log('Auth URL generated:', authUrl);
+    if (!authUrl) {
+        return res.status(500).send('Failed to generate auth URL');
+    }
     req.session.state = state;
     res.redirect(authUrl);
 });
 
-app.get('/oauth2callback', async (req, res) => {
+app.get('/callback', async (req, res) => {
+    console.log('Callback route hit!', { query: req.query });
     const { code, state } = req.query;
 
     if (state !== req.session.state) {
@@ -65,7 +71,6 @@ app.get('/fetch_emails', async (req, res) => {
 
     try {
         for await (const update of gmailFetchService.fetchEmailsGenerator()) {
-            // Send each update as an SSE event
             res.write(`data: ${update}\n\n`);
         }
     } catch (error) {
@@ -74,6 +79,10 @@ app.get('/fetch_emails', async (req, res) => {
     } finally {
         res.end();
     }
+});
+
+app.get('/test', (req, res) => {
+    res.send('Test route working!');
 });
 
 app.listen(port, () => {
