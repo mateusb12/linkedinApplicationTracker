@@ -157,9 +157,9 @@
         <progress id="progress-bar" value="0" max="100"></progress>
 
         <div class="progress-data" style="display: none;">
-            <div><span class="label">Emails Processed:</span> <span id="emails-processed">0</span></div>
-            <div><span class="label">Total Emails:</span> <span id="total-emails">0</span></div>
-            <div><span class="label">Current Speed (emails/sec):</span> <span id="current-speed">0</span></div>
+            <div><span class="label">Emails Processed:</span> <span id="emails-processed">0</span>/<span
+                        id="total-emails">0</span></div>
+            <div><span class="label">Emails per second:</span> <span id="current-speed">0</span></div>
             <div><span class="label">Remaining Emails:</span> <span id="remaining-emails">0</span></div>
             <div><span class="label">Remaining Time:</span> <span id="remaining-time">Calculating...</span></div>
             <div><span class="label">ETA:</span> <span id="eta">Calculating...</span></div>
@@ -217,13 +217,61 @@
                     const percentage = (processed / total) * 100;
                     progressBar.value = percentage;
 
-                    // Update progress data with null checks
+                    // Update progress data with new format
                     emailsProcessed.textContent = processed;
                     totalEmails.textContent = total;
                     currentSpeed.textContent = data.current_speed ? data.current_speed.toFixed(2) : '0';
                     remainingEmails.textContent = data.remaining_emails || '0';
                     remainingTime.textContent = data.remaining_time_formatted || 'Calculating...';
-                    eta.textContent = data.eta_formatted || 'Calculating...';
+
+                    // Convert ETA to 24-hour format
+                    if (data.eta_formatted) {
+                        try {
+                            // Example of expected format: "2:34:03 PM" or "02:34:03 PM"
+                            const timeStr = data.eta_formatted.trim();
+                            const regex = /^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/i;
+                            const match = timeStr.match(regex);
+
+                            if (match) {
+                                let [_, hour, minute, second, period] = match;
+
+                                hour = parseInt(hour, 10);
+                                minute = parseInt(minute, 10);
+                                second = parseInt(second, 10);
+
+                                if (period.toUpperCase() === 'PM' && hour < 12) {
+                                    hour += 12;
+                                }
+                                if (period.toUpperCase() === 'AM' && hour === 12) {
+                                    hour = 0;
+                                }
+
+                                // Ensure two digits for each component
+                                const formattedHour = hour.toString().padStart(2, '0');
+                                const formattedMinute = minute.toString().padStart(2, '0');
+                                const formattedSecond = second.toString().padStart(2, '0');
+
+                                eta.textContent = `${formattedHour}:${formattedMinute}:${formattedSecond}`;
+                            } else {
+                                // If the format doesn't match, attempt to parse as a 24-hour time
+                                const [hour, minute, second] = timeStr.split(':').map(Number);
+                                if (
+                                    !isNaN(hour) && hour >= 0 && hour < 24 &&
+                                    !isNaN(minute) && minute >= 0 && minute < 60 &&
+                                    !isNaN(second) && second >= 0 && second < 60
+                                ) {
+                                    eta.textContent = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
+                                } else {
+                                    throw new Error('Invalid time format');
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error parsing ETA:', error, data.eta_formatted);
+                            eta.textContent = 'Error';
+                        }
+                    } else {
+                        eta.textContent = 'Calculating...';
+                    }
                 }
 
                 if (data.message) {
