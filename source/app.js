@@ -1,9 +1,9 @@
 const express = require('express');
 const session = require('express-session');
-const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const favicon = require('serve-favicon');
+const authService = require('./services/authService');
 
 const app = express();
 const port = 8080;
@@ -23,34 +23,16 @@ app.use(session({
     saveUninitialized: true
 }));
 
-// OAuth2 setup
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const CLIENT_SECRETS_FILE = path.join(__dirname, 'gmail_analysis/credentials.json'); // Update path as needed
-
-const credentials = JSON.parse(fs.readFileSync(CLIENT_SECRETS_FILE));
-const { client_secret, client_id, redirect_uris } = credentials.web;
-
-const oauth2Client = new google.auth.OAuth2(
-    client_id,
-    client_secret,
-    'http://localhost:8080/oauth2callback' // Explicitly set redirect URI
-);
-
 // Routes
 app.get('/', (req, res) => {
-    const authenticated = fs.existsSync('token.json');
+    const authenticated = authService.isAuthenticated();
     res.render('index', { authenticated });
 });
 
-app.get('/gmail_auth', (req, res) => {
+app.get('/auth/gmail', (req, res) => {
     const state = Math.random().toString(36).substring(7);
+    const authUrl = authService.generateAuthUrl(state);
     req.session.state = state;
-    const authUrl = oauth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: SCOPES,
-        include_granted_scopes: true,
-        state: state // Use the same state
-    });
     res.redirect(authUrl);
 });
 
@@ -62,11 +44,7 @@ app.get('/oauth2callback', async (req, res) => {
     }
     
     try {
-        const { tokens } = await oauth2Client.getToken(code);
-        oauth2Client.setCredentials(tokens);
-        
-        // Save the tokens
-        fs.writeFileSync('token.json', JSON.stringify(tokens));
+        await authService.getAndSaveTokens(code);
         res.redirect('/');
     } catch (error) {
         console.error('Error getting tokens:', error);
@@ -74,20 +52,28 @@ app.get('/oauth2callback', async (req, res) => {
     }
 });
 
-app.get('/fetch_emails', (req, res) => {
+app.get('/fetch_emails', async (req, res) => {
+    if (!authService.isAuthenticated()) {
+        return res.status(401).send('Not authenticated');
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const fetchEmails = async () => {
-        // Implementation of email fetching logic goes here
-        // You'll need to implement the equivalent of fetch_emails_generator()
-        // Example:
-        const progress = 'Fetching emails...';
-        res.write(`data: ${progress}\n\n`);
-    };
+    const gmailFetchService = require('./services/gmailFetchService');
 
-    fetchEmails().catch(console.error);
+    try {
+        for await (const update of gmailFetchService.fetchEmailsGenerator()) {
+            // Send each update as an SSE event
+            res.write(`data: ${update}\n\n`);
+        }
+    } catch (error) {
+        console.error('Error fetching emails:', error);
+        res.write(`data: ${JSON.stringify({ error: 'Error fetching emails' })}\n\n`);
+    } finally {
+        res.end();
+    }
 });
 
 app.listen(port, () => {

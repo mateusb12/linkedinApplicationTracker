@@ -4,7 +4,7 @@ const path = require('path');
 
 class GmailAuthService {
     constructor() {
-        const CLIENT_SECRETS_FILE = path.join(__dirname, '../gmail_analysis/credentials.json');
+        const CLIENT_SECRETS_FILE = path.join(__dirname, '../secrets/credentials.json');
         const credentials = JSON.parse(fs.readFileSync(CLIENT_SECRETS_FILE));
         const { client_secret, client_id } = credentials.web;
 
