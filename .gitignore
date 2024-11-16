@@ -10,6 +10,5 @@
 /source/email_results.json
 /.env
 /project_utils/project_structure_generator/directory_structure.json
-/source/token.json
 /source/secrets/credentials.json
-/source/services/token.json
+/source/tokens/token.json

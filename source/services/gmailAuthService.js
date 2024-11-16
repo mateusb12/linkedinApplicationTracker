@@ -3,7 +3,7 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 
-const TOKEN_PATH = path.join(__dirname, 'token.json');
+const TOKEN_PATH = path.join(__dirname, '../tokens/token.json');
 const CREDENTIALS_PATH = path.join(__dirname, '../secrets/credentials.json');
 
 class GmailAuthService {
@@ -68,6 +68,13 @@ class GmailAuthService {
     async getAndSaveTokens(code) {
         const { tokens } = await this.oAuth2Client.getToken(code);
         this.oAuth2Client.setCredentials(tokens);
+        
+        // Create tokens directory if it doesn't exist
+        const tokensDir = path.dirname(TOKEN_PATH);
+        if (!fs.existsSync(tokensDir)) {
+            fs.mkdirSync(tokensDir, { recursive: true });
+        }
+        
         fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
     }
 
