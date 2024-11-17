@@ -26,6 +26,8 @@
 
         main {
             padding: 20px;
+            max-width: 960px; /* or any other suitable width */
+            margin: 0 auto; /* This centers the main content horizontally */
         }
 
         section {
@@ -117,17 +119,24 @@
         }
 
         .progress-data {
-            margin-top: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .progress-data h3 {
+            margin-top: 0;
         }
 
         .progress-data div {
-            font-size: 14px;
+            /*display: flex;*/
+            /*justify-content: flex-start; !* This will place content at either end of the container *!*/
+            /*gap: 10px; !* Adjusts space between items in flex container *!*/
         }
 
-        .progress-data span.label {
+        .progress-data div .label {
             font-weight: bold;
         }
 
@@ -154,6 +163,7 @@
             justify-content: center;
             align-items: center;
         }
+
     </style>
 </head>
 <body>
@@ -170,6 +180,12 @@
 
     <section id="fetch-emails" class="border-container">
         <h2>Fetch Emails</h2>
+        <div id="last-fetch-info"
+             style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <h3 style="margin-top: 0;">Last Fetch Information</h3>
+            <div><strong>Last Fetch:</strong> <span id="last-fetch-time">Never</span></div>
+            <div><strong>Emails Found:</strong> <span id="last-fetch-count">0</span></div>
+        </div>
         <p>After authentication, fetch your latest job application emails.</p>
         <button id="fetch-button"
                 onclick="fetchEmails()"
@@ -180,13 +196,15 @@
         </button>
         <progress id="progress-bar" value="0" max="100"></progress>
 
-        <div class="progress-data" style="display: none;">
-            <div><span class="label">Emails Processed:</span> <span id="emails-processed">0</span>/<span
+        <div class="progress-data">
+            <h3 style="margin-top: 0;">Processing Statistics</h3>
+            <div class="single-metric"><b class="metric-key">Start Time:</b> <span id="fetch-start-time">Not started</span></div>
+            <div class="single-metric"><b class="metric-key">Elapsed Time:</b> <span id="fetch-elapsed-time">0:00</span></div>
+            <div class="single-metric"><b class="metric-key">Progress:</b> <span id="emails-processed">0</span>/<span
                         id="total-emails">0</span></div>
-            <div><span class="label">Emails per second:</span> <span id="current-speed">0</span></div>
-            <div><span class="label">Remaining Emails:</span> <span id="remaining-emails">0</span></div>
-            <div><span class="label">Remaining Time:</span> <span id="remaining-time">Calculating...</span></div>
-            <div><span class="label">ETA:</span> <span id="eta">Calculating...</span></div>
+            <div class="single-metric"><b class="metric-key">Speed:</b> <span id="current-speed">0</span> emails/sec</div>
+            <div class="single-metric"><b class="metric-key">Remaining:</b> <span id="remaining-emails">0</span> emails</div>
+            <div class="single-metric"><b class="metric-key">ETA:</b> <span id="eta">Calculating...</span></div>
         </div>
 
         <% if (!authenticated) { %>
@@ -199,7 +217,9 @@
         <p>View your job application statistics over time.</p>
         <div class="tracking-controls">
             <button id="generate-chart-button" onclick="generateApplicationChart()"
-                    <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"<% } %>>
+                    <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"
+                    <% } %>
+            >
                 Generate Application Chart
             </button>
             <select id="view-type" class="chart-control">
@@ -211,7 +231,8 @@
             </select>
         </div>
         <div id="chart-container">
-            <img id="chart-image" src="" alt="Application Chart" style="display: none; max-width: 100%; margin-top: 20px;">
+            <img id="chart-image" src="" alt="Application Chart"
+                 style="display: none; max-width: 100%; margin-top: 20px;">
         </div>
     </section>
 </main>
@@ -219,6 +240,42 @@
     <p>Developed by <a href="https://mateusb12.github.io/mateus_portfolio/">Mateus</a></p>
 </footer>
 <script>
+    let fetchStartTime = null;
+    let fetchUpdateInterval = null;
+
+    function updateElapsedTime() {
+        if (!fetchStartTime) return;
+
+        const now = new Date();
+        const elapsed = Math.floor((now - fetchStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+
+        document.getElementById('fetch-elapsed-time').textContent =
+            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    async function updateLastFetchInfo() {
+        try {
+            const response = await fetch('/fetch-metadata');
+            const metadata = await response.json();
+
+            const lastFetchTimeEl = document.getElementById('last-fetch-time');
+            const lastFetchCountEl = document.getElementById('last-fetch-count');
+
+            if (metadata.lastFetchTime) {
+                const date = new Date(metadata.lastFetchTime);
+                lastFetchTimeEl.textContent = date.toLocaleString();
+                lastFetchCountEl.textContent = metadata.emailsFetched;
+            } else {
+                lastFetchTimeEl.textContent = 'Never';
+                lastFetchCountEl.textContent = '0';
+            }
+        } catch (error) {
+            console.error('Error fetching metadata:', error);
+        }
+    }
+
     function fetchEmails() {
         document.querySelector('.progress-data').style.display = 'block';
         const progressBar = document.getElementById('progress-bar');
@@ -227,20 +284,20 @@
         const totalEmails = document.getElementById('total-emails');
         const currentSpeed = document.getElementById('current-speed');
         const remainingEmails = document.getElementById('remaining-emails');
-        const remainingTime = document.getElementById('remaining-time');
         const eta = document.getElementById('eta');
+
+        // Reset and start metadata tracking
+        fetchStartTime = new Date();
+        document.getElementById('fetch-start-time').textContent = fetchStartTime.toLocaleTimeString();
+
+        if (fetchUpdateInterval) {
+            clearInterval(fetchUpdateInterval);
+        }
+        fetchUpdateInterval = setInterval(updateElapsedTime, 1000);
 
         progressBar.style.display = 'block';
         fetchButton.disabled = true;
         fetchButton.style.backgroundColor = 'grey';
-
-        // Reset previous data
-        emailsProcessed.textContent = '0';
-        totalEmails.textContent = '0';
-        currentSpeed.textContent = '0';
-        remainingEmails.textContent = '0';
-        remainingTime.textContent = 'Calculating...';
-        eta.textContent = 'Calculating...';
 
         const eventSource = new EventSource('/fetch_emails');
 
@@ -254,71 +311,22 @@
                     const percentage = (processed / total) * 100;
                     progressBar.value = percentage;
 
-                    // Update progress data with new format
+                    // Update both progress data and metadata
                     emailsProcessed.textContent = processed;
                     totalEmails.textContent = total;
                     currentSpeed.textContent = data.current_speed ? data.current_speed.toFixed(2) : '0';
                     remainingEmails.textContent = data.remaining_emails || '0';
-                    remainingTime.textContent = data.remaining_time_formatted || 'Calculating...';
 
-                    // Convert ETA to 24-hour format
-                    if (data.eta_formatted) {
-                        try {
-                            // Example of expected format: "2:34:03 PM" or "02:34:03 PM"
-                            const timeStr = data.eta_formatted.trim();
-                            const regex = /^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/i;
-                            const match = timeStr.match(regex);
-
-                            if (match) {
-                                let [_, hour, minute, second, period] = match;
-
-                                hour = parseInt(hour, 10);
-                                minute = parseInt(minute, 10);
-                                second = parseInt(second, 10);
-
-                                if (period.toUpperCase() === 'PM' && hour < 12) {
-                                    hour += 12;
-                                }
-                                if (period.toUpperCase() === 'AM' && hour === 12) {
-                                    hour = 0;
-                                }
-
-                                // Ensure two digits for each component
-                                const formattedHour = hour.toString().padStart(2, '0');
-                                const formattedMinute = minute.toString().padStart(2, '0');
-                                const formattedSecond = second.toString().padStart(2, '0');
-
-                                eta.textContent = `${formattedHour}:${formattedMinute}:${formattedSecond}`;
-                            } else {
-                                // If the format doesn't match, attempt to parse as a 24-hour time
-                                const [hour, minute, second] = timeStr.split(':').map(Number);
-                                if (
-                                    !isNaN(hour) && hour >= 0 && hour < 24 &&
-                                    !isNaN(minute) && minute >= 0 && minute < 60 &&
-                                    !isNaN(second) && second >= 0 && second < 60
-                                ) {
-                                    eta.textContent = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
-                                } else {
-                                    throw new Error('Invalid time format');
-                                }
-                            }
-                        } catch (error) {
-                            console.error('Error parsing ETA:', error, data.eta_formatted);
-                            eta.textContent = 'Error';
-                        }
-                    } else {
-                        eta.textContent = 'Calculating...';
-                    }
+                    // Update metadata display
+                    updateLastFetchInfo();
                 }
 
-                if (data.message) {
-                    console.log(data.message);
-                    if (data.message === "Email fetching completed.") {
-                        eventSource.close();
-                        fetchButton.disabled = false;
-                        fetchButton.style.backgroundColor = '#0077b5';
-                        alert('Emails fetched successfully!');
-                    }
+                if (data.message === "Email fetching completed.") {
+                    eventSource.close();
+                    fetchButton.disabled = false;
+                    fetchButton.style.backgroundColor = '#0077b5';
+                    clearInterval(fetchUpdateInterval);
+                    alert('Emails fetched successfully!');
                 }
 
                 if (data.error) {
@@ -338,6 +346,7 @@
             eventSource.close();
             fetchButton.disabled = false;
             fetchButton.style.backgroundColor = '#0077b5';
+            clearInterval(fetchUpdateInterval);
             alert('An error occurred while fetching emails.');
         };
     }
@@ -346,17 +355,17 @@
         const button = document.getElementById('generate-chart-button');
         const chartImage = document.getElementById('chart-image');
         const viewType = document.getElementById('view-type').value;
-        
+
         button.disabled = true;
         button.style.backgroundColor = 'grey';
-        
+
         try {
             const response = await fetch('/generate-application-chart', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ viewType }),
+                body: JSON.stringify({viewType}),
             });
 
             if (!response.ok) {
@@ -375,6 +384,10 @@
             button.style.backgroundColor = '#0077b5';
         }
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateLastFetchInfo();
+    });
 </script>
 </body>
 </html>

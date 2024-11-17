@@ -5,6 +5,7 @@ const path = require('path');
 const favicon = require('serve-favicon');
 const authService = require('./services/gmailAuthService');
 const ApplicationTrackingService = require('./services/applicationTrackingService');
+const fetchMetadataService = require('./services/fetchMetadataService');
 
 const app = express();
 const port = 8080;
@@ -59,6 +60,15 @@ app.get('/callback', async (req, res) => {
     }
 });
 
+app.get('/fetch-metadata', async (req, res) => {
+    if (!authService.isAuthenticated()) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const metadata = await fetchMetadataService.getMetadata();
+    res.json(metadata);
+});
+
 app.get('/fetch_emails', async (req, res) => {
     if (!authService.isAuthenticated()) {
         return res.status(401).send('Not authenticated');
@@ -69,11 +79,20 @@ app.get('/fetch_emails', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
 
     const gmailFetchService = require('./services/gmailFetchService');
+    let emailCount = 0;
 
     try {
         for await (const update of gmailFetchService.fetchEmailsGenerator()) {
             res.write(`data: ${update}\n\n`);
+            
+            // Count processed emails
+            const data = JSON.parse(update);
+            if (data.emails_processed && data.total_emails) {
+                emailCount = data.total_emails;
+            }
         }
+        // Update metadata after successful fetch
+        await fetchMetadataService.updateMetadata(emailCount);
     } catch (error) {
         console.error('Error fetching emails:', error);
         res.write(`data: ${JSON.stringify({ error: 'Error fetching emails' })}\n\n`);
