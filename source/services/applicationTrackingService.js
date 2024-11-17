@@ -8,12 +8,8 @@ class ApplicationTrackingService {
     async loadData(filename) {
         try {
             const filePath = path.join(__dirname, '..', 'data', filename);
-            console.log('Loading data from:', filePath);
             const data = await fs.readFile(filePath, 'utf-8');
-            const parsedData = JSON.parse(data);
-            // Debug the loaded data
-            console.log('Loaded data structure:', JSON.stringify(parsedData).slice(0, 200) + '...');
-            return parsedData;
+            return JSON.parse(data);
         } catch (error) {
             console.error(`Error loading data: ${error}`);
             process.exit(1);
@@ -23,27 +19,17 @@ class ApplicationTrackingService {
     countApplications(data) {
         const applicationCounts = new Map();
         
-        // Check if data is an array
         if (Array.isArray(data)) {
-            console.log('Data is an array with length:', data.length);
-            // Handle array data structure
             for (const email of data) {
                 try {
-                    if (!email.internalDate) {
-                        console.log('Email missing internalDate:', email.id);
-                        continue;
-                    }
+                    if (!email.internalDate) continue;
                     
-                    // Convert Unix timestamp (milliseconds) to DateTime
                     const date = DateTime.fromMillis(parseInt(email.internalDate));
-                    if (!date.isValid) {
-                        console.log('Invalid date from timestamp:', email.internalDate);
-                        continue;
-                    }
+                    if (!date.isValid) continue;
                     
                     const subject = email.snippet?.toLowerCase() || '';
                     if (subject.includes('your application was sent')) {
-                        const dateKey = date.toISO();
+                        const dateKey = date.startOf('day').toISO();
                         applicationCounts.set(dateKey, (applicationCounts.get(dateKey) || 0) + 1);
                     }
                 } catch (error) {
@@ -103,7 +89,6 @@ class ApplicationTrackingService {
         const sortedCounts = Array.from(counts.entries()).sort();
         const labels = sortedCounts.map(([date]) => DateTime.fromISO(date));
         const values = sortedCounts.map(([, count]) => count);
-        console.log(`Using ${viewType} view.`);
         return { labels, values, level: viewType };
     }
 
@@ -137,7 +122,11 @@ class ApplicationTrackingService {
                     data: values,
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
                     borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
+                    borderWidth: 2,
+                    borderRadius: 4,
+                    hoverBackgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    hoverBorderColor: 'rgba(54, 162, 235, 1)',
+                    hoverBorderWidth: 3
                 }]
             },
             options: {
@@ -148,11 +137,15 @@ class ApplicationTrackingService {
                         beginAtZero: true,
                         ticks: {
                             stepSize: 1,
-                            padding: 10
+                            padding: 10,
+                            font: {
+                                weight: 'bold'
+                            }
                         },
                         grid: {
                             drawBorder: true,
-                            color: 'rgba(200, 200, 200, 0.3)'
+                            color: 'rgba(200, 200, 200, 0.3)',
+                            borderWidth: 2
                         }
                     },
                     x: {
@@ -160,7 +153,10 @@ class ApplicationTrackingService {
                             maxRotation: 0,
                             minRotation: 0,
                             padding: 10,
-                            autoSkip: false
+                            autoSkip: false,
+                            font: {
+                                weight: 'bold'
+                            }
                         },
                         grid: {
                             display: false
@@ -172,13 +168,19 @@ class ApplicationTrackingService {
                         display: true,
                         text: 'Applications Over Time',
                         font: {
-                            size: 16
+                            size: 16,
+                            weight: 'bold'
                         },
                         padding: 20
                     },
                     legend: {
                         position: 'top',
-                        padding: 20
+                        padding: 20,
+                        labels: {
+                            font: {
+                                weight: 'bold'
+                            }
+                        }
                     }
                 },
                 layout: {
@@ -192,10 +194,8 @@ class ApplicationTrackingService {
             }
         });
 
-        // Save the chart
         const buffer = canvas.toBuffer('image/png');
         await fs.writeFile(path.join(__dirname, '..', '..', 'applications_chart.png'), buffer);
-        console.log('Chart has been saved as applications_chart.png');
     }
 }
 
