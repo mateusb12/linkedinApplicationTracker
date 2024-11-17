@@ -130,6 +130,30 @@
         .progress-data span.label {
             font-weight: bold;
         }
+
+        .tracking-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chart-control {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+
+        #chart-container {
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -173,8 +197,20 @@
     <section id="application-tracking" class="border-container">
         <h2>Application Tracking</h2>
         <p>View your job application statistics over time.</p>
-        <div id="chart-placeholder">
-            <img src="static/dummy_chart.png" alt="Application Chart">
+        <div class="tracking-controls">
+            <button id="generate-chart-button" onclick="generateApplicationChart()"
+                    <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"<% } %>>
+                Generate Application Chart
+            </button>
+            <select id="max-points" class="chart-control">
+                <option value="10">10 points max</option>
+                <option value="20">20 points max</option>
+                <option value="30">30 points max</option>
+                <option value="50">50 points max</option>
+            </select>
+        </div>
+        <div id="chart-container">
+            <img id="chart-image" src="" alt="Application Chart" style="display: none; max-width: 100%; margin-top: 20px;">
         </div>
     </section>
 </main>
@@ -303,6 +339,40 @@
             fetchButton.style.backgroundColor = '#0077b5';
             alert('An error occurred while fetching emails.');
         };
+    }
+
+    async function generateApplicationChart() {
+        const button = document.getElementById('generate-chart-button');
+        const chartImage = document.getElementById('chart-image');
+        const maxPoints = document.getElementById('max-points').value;
+        
+        button.disabled = true;
+        button.style.backgroundColor = 'grey';
+        
+        try {
+            const response = await fetch('/generate-application-chart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ maxPoints }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate chart');
+            }
+
+            // Force browser to load new image by adding timestamp
+            const timestamp = new Date().getTime();
+            chartImage.src = `/applications_chart.png?t=${timestamp}`;
+            chartImage.style.display = 'block';
+        } catch (error) {
+            console.error('Error generating chart:', error);
+            alert('Error generating application chart');
+        } finally {
+            button.disabled = false;
+            button.style.backgroundColor = '#0077b5';
+        }
     }
 </script>
 </body>

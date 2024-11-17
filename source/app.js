@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const favicon = require('serve-favicon');
 const authService = require('./services/gmailAuthService');
+const ApplicationTrackingService = require('./services/applicationTrackingService');
 
 const app = express();
 const port = 8080;
@@ -83,6 +84,40 @@ app.get('/fetch_emails', async (req, res) => {
 
 app.get('/test', (req, res) => {
     res.send('Test route working!');
+});
+
+app.post('/generate-application-chart', async (req, res) => {
+    if (!authService.isAuthenticated()) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+        const tracker = new ApplicationTrackingService();
+        const maxPoints = parseInt(req.body.maxPoints) || 10;
+        
+        // Load the email data
+        const data = await tracker.loadData('email_results.json');
+        const applicationCounts = tracker.countApplications(data);
+
+        if (applicationCounts.size === 0) {
+            return res.status(404).json({ error: 'No application data found' });
+        }
+
+        const countsDict = tracker.aggregateCounts(applicationCounts);
+        const { labels, values, level } = tracker.determinePlotData(countsDict, maxPoints);
+
+        // Generate the chart and save it to public directory
+        await tracker.generateChart(labels, values, level);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error generating chart:', error);
+        res.status(500).json({ error: 'Failed to generate chart' });
+    }
+});
+
+app.get('/applications_chart.png', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'applications_chart.png'));
 });
 
 app.listen(port, () => {
