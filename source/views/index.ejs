@@ -202,11 +202,12 @@
                     <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"<% } %>>
                 Generate Application Chart
             </button>
-            <select id="max-points" class="chart-control">
-                <option value="10">10 points max</option>
-                <option value="20">20 points max</option>
-                <option value="30">30 points max</option>
-                <option value="50">50 points max</option>
+            <select id="view-type" class="chart-control">
+                <option value="day">Daily View</option>
+                <option value="week" selected>Weekly View</option>
+                <option value="month">Monthly View</option>
+                <option value="quarter">Quarterly View</option>
+                <option value="year">Yearly View</option>
             </select>
         </div>
         <div id="chart-container">
@@ -344,7 +345,7 @@
     async function generateApplicationChart() {
         const button = document.getElementById('generate-chart-button');
         const chartImage = document.getElementById('chart-image');
-        const maxPoints = document.getElementById('max-points').value;
+        const viewType = document.getElementById('view-type').value;
         
         button.disabled = true;
         button.style.backgroundColor = 'grey';
@@ -355,7 +356,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ maxPoints }),
+                body: JSON.stringify({ viewType }),
             });
 
             if (!response.ok) {

@@ -93,7 +93,7 @@ app.post('/generate-application-chart', async (req, res) => {
 
     try {
         const tracker = new ApplicationTrackingService();
-        const maxPoints = parseInt(req.body.maxPoints) || 10;
+        const viewType = req.body.viewType || 'week'; // Default to weekly view
         
         // Load the email data
         const data = await tracker.loadData('email_results.json');
@@ -104,7 +104,7 @@ app.post('/generate-application-chart', async (req, res) => {
         }
 
         const countsDict = tracker.aggregateCounts(applicationCounts);
-        const { labels, values, level } = tracker.determinePlotData(countsDict, maxPoints);
+        const { labels, values, level } = tracker.determinePlotData(countsDict, viewType);
 
         // Generate the chart and save it to public directory
         await tracker.generateChart(labels, values, level);

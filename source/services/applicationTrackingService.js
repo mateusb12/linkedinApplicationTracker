@@ -93,22 +93,18 @@ class ApplicationTrackingService {
         };
     }
 
-    determinePlotData(countsDict, maxPoints) {
-        const aggregationLevels = ['day', 'week', 'month', 'quarter', 'year'];
-
-        for (const level of aggregationLevels) {
-            const counts = countsDict[level];
-            if (counts.size <= maxPoints) {
-                const sortedCounts = Array.from(counts.entries()).sort();
-                const labels = sortedCounts.map(([date]) => DateTime.fromISO(date));
-                const values = sortedCounts.map(([, count]) => count);
-                console.log(`The script has chosen ${level}.`);
-                return { labels, values, level };
-            }
+    determinePlotData(countsDict, viewType) {
+        const counts = countsDict[viewType];
+        if (!counts) {
+            console.error(`Invalid view type: ${viewType}`);
+            process.exit(1);
         }
 
-        console.error("Data is too large to plot.");
-        process.exit(1);
+        const sortedCounts = Array.from(counts.entries()).sort();
+        const labels = sortedCounts.map(([date]) => DateTime.fromISO(date));
+        const values = sortedCounts.map(([, count]) => count);
+        console.log(`Using ${viewType} view.`);
+        return { labels, values, level: viewType };
     }
 
     async generateChart(labels, values, level) {
@@ -122,7 +118,7 @@ class ApplicationTrackingService {
                 case 'day':
                     return dateTime.toFormat('dd/MMM');
                 case 'week':
-                    return `Week ${dateTime.weekNumber}\n${dateTime.toFormat('MMM yyyy')}`;
+                    return `Week ${dateTime.weekNumber} ${dateTime.toFormat('MMM yyyy')}`;
                 case 'month':
                     return dateTime.toFormat('MMM yyyy');
                 case 'quarter':
@@ -161,9 +157,10 @@ class ApplicationTrackingService {
                     },
                     x: {
                         ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            padding: 10
+                            maxRotation: 0,
+                            minRotation: 0,
+                            padding: 10,
+                            autoSkip: false
                         },
                         grid: {
                             display: false
@@ -189,7 +186,7 @@ class ApplicationTrackingService {
                         left: 20,
                         right: 20,
                         top: 20,
-                        bottom: 40
+                        bottom: 60
                     }
                 }
             }
