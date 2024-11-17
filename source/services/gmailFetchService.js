@@ -58,14 +58,11 @@ class GmailFetchService {
 
             // Save all emails to JSON file
             const resultsPath = path.join(__dirname, '../data/email_results.json');
-            console.log('Attempting to save emails to:', resultsPath);
             
             try {
                 await fs.mkdir(path.dirname(resultsPath), { recursive: true });
-                console.log('Directory created/verified');
                 
                 await fs.writeFile(resultsPath, JSON.stringify(emailResults, null, 2));
-                console.log('File successfully written');
             } catch (fileError) {
                 console.error('Error saving file:', fileError);
                 throw fileError;
