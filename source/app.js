@@ -103,7 +103,6 @@ app.get('/fetch_emails', async (req, res) => {
             res.write(`data: ${update}\n\n`);
 
             // Log the update being sent to the client
-            console.log(`Update sent: ${update}`);
 
             // Update email count for metadata
             const data = JSON.parse(update);

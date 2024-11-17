@@ -55,8 +55,6 @@ class GmailAuthService {
                 state: state,
                 prompt: 'consent'
             });
-            console.log('Redirect URIs:', this.credentials.installed?.redirect_uris || this.credentials.web?.redirect_uris);
-            console.log('Generated Auth URL:', url);
             return url;
         } catch (error) {
             console.error('Error generating auth URL:', error);

@@ -202,6 +202,11 @@
             >
                 Fetch Emails
             </button>
+            <button id="stop-fetch-button" 
+                    onclick="stopFetch()" 
+                    style="background-color: #dc3545; display: none;">
+                Stop Fetch
+            </button>
         </div>
         <progress id="progress-bar" value="0" max="100"></progress>
 
@@ -251,6 +256,7 @@
 <script>
     let fetchStartTime = null;
     let fetchUpdateInterval = null;
+    let eventSource = null;
 
     function updateElapsedTime() {
         if (!fetchStartTime) return;
@@ -295,11 +301,30 @@
         }
     }
 
+    function stopFetch() {
+        if (eventSource) {
+            eventSource.close();
+            resetFetchUI();
+            alert('Email fetching stopped by user.');
+        }
+    }
+
+    function resetFetchUI() {
+        const fetchButton = document.getElementById('fetch-button');
+        const stopFetchButton = document.getElementById('stop-fetch-button');
+        
+        fetchButton.disabled = false;
+        fetchButton.style.backgroundColor = '#0077b5';
+        stopFetchButton.style.display = 'none';
+        clearInterval(fetchUpdateInterval);
+    }
+
     function fetchEmails() {
         const fetchAmount = document.getElementById('fetch-amount').value;
         document.querySelector('.progress-data').style.display = 'block';
         const progressBar = document.getElementById('progress-bar');
         const fetchButton = document.getElementById('fetch-button');
+        const stopFetchButton = document.getElementById('stop-fetch-button');
         const emailsProcessed = document.getElementById('emails-processed');
         const totalEmails = document.getElementById('total-emails');
         const currentSpeed = document.getElementById('current-speed');
@@ -326,8 +351,9 @@
         progressBar.style.display = 'block';
         fetchButton.disabled = true;
         fetchButton.style.backgroundColor = 'grey';
+        stopFetchButton.style.display = 'inline-block';
 
-        const eventSource = new EventSource(`/fetch_emails?amount=${fetchAmount}`);
+        eventSource = new EventSource(`/fetch_emails?amount=${fetchAmount}`);
 
         let lastUpdate = Date.now();
         let lastProcessed = 0;
@@ -362,9 +388,8 @@
                         
                         if (speed > 0) {
                             const etaSeconds = remaining / speed;
-                            const etaMinutes = Math.floor(etaSeconds / 60);
-                            const etaSecondsRemainder = Math.floor(etaSeconds % 60);
-                            eta.textContent = `${etaMinutes}:${etaSecondsRemainder.toString().padStart(2, '0')}`;
+                            const etaTimestamp = formatCurrentTimePlusSeconds(etaSeconds);
+                            eta.textContent = etaTimestamp;
                         }
                     }
                     
@@ -377,9 +402,7 @@
 
                 if (data.message === "Email fetching completed.") {
                     eventSource.close();
-                    fetchButton.disabled = false;
-                    fetchButton.style.backgroundColor = '#0077b5';
-                    clearInterval(fetchUpdateInterval);
+                    resetFetchUI();
                     alert('Emails fetched successfully!');
                 }
 
@@ -387,9 +410,8 @@
                     console.error(data.error);
                     alert(`Error: ${data.error}`);
                     eventSource.close();
-                    fetchButton.disabled = false;
-                    fetchButton.style.backgroundColor = '#0077b5';
-                    clearInterval(fetchUpdateInterval);
+                    resetFetchUI();
+                    alert('An error occurred while fetching emails.');
                 }
             } catch (error) {
                 console.error('Error parsing data:', error);
@@ -399,11 +421,15 @@
         eventSource.onerror = function (e) {
             console.error('EventSource failed.', e);
             eventSource.close();
-            fetchButton.disabled = false;
-            fetchButton.style.backgroundColor = '#0077b5';
-            clearInterval(fetchUpdateInterval);
+            resetFetchUI();
             alert('An error occurred while fetching emails.');
         };
+    }
+
+    function formatCurrentTimePlusSeconds(seconds) {
+        const now = new Date();
+        const etaDate = new Date(now.getTime() + (seconds * 1000));
+        return etaDate.toLocaleTimeString('en-GB', { hour12: false });
     }
 
     async function generateApplicationChart() {
