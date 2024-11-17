@@ -43,7 +43,7 @@ app.get('/auth/gmail', (req, res) => {
     res.redirect(authUrl);
 });
 
-app.get('/callback', async (req, res) => {
+app.get('/oauth2callback', async (req, res) => {
     console.log('Callback route hit!', { query: req.query });
     const { code, state } = req.query;
 

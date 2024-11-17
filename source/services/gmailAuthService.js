@@ -10,6 +10,7 @@ class GmailAuthService {
     constructor() {
         this.oAuth2Client = null;
         this.credentials = null;
+        this.redirectUri = 'http://localhost:8080/oauth2callback';
         this.loadCredentials();
     }
 
@@ -19,10 +20,10 @@ class GmailAuthService {
                 const content = fs.readFileSync(CREDENTIALS_PATH);
                 this.credentials = JSON.parse(content);
                 
-                const { client_secret, client_id, redirect_uris } = this.credentials.installed || this.credentials.web;
+                const { client_secret, client_id } = this.credentials.installed || this.credentials.web;
                 
                 this.oAuth2Client = new google.auth.OAuth2(
-                    client_id, client_secret, redirect_uris[0]
+                    client_id, client_secret, this.redirectUri
                 );
             } else {
                 console.error('Error: Credentials file not found at:', CREDENTIALS_PATH);
