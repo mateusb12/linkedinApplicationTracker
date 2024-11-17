@@ -306,6 +306,14 @@
         const remainingEmails = document.getElementById('remaining-emails');
         const eta = document.getElementById('eta');
 
+        // Reset and show progress elements
+        progressBar.value = 0;
+        emailsProcessed.textContent = '0';
+        totalEmails.textContent = '0';
+        currentSpeed.textContent = '0';
+        remainingEmails.textContent = '0';
+        eta.textContent = 'Calculating...';
+
         // Reset and start metadata tracking
         fetchStartTime = new Date();
         document.getElementById('fetch-start-time').textContent = fetchStartTime.toLocaleTimeString('en-GB', { hour12: false });
@@ -321,6 +329,9 @@
 
         const eventSource = new EventSource(`/fetch_emails?amount=${fetchAmount}`);
 
+        let lastUpdate = Date.now();
+        let lastProcessed = 0;
+
         eventSource.onmessage = function (e) {
             try {
                 const data = JSON.parse(e.data);
@@ -328,14 +339,37 @@
                 if (data.emails_processed !== undefined && data.total_emails !== undefined) {
                     const processed = data.emails_processed;
                     const total = data.total_emails;
+                    console.log(`Processed: ${processed}, Total: ${total}`);
+                    
                     const percentage = (processed / total) * 100;
+                    
+                    // Update progress bar and counts
                     progressBar.value = percentage;
-
-                    // Update both progress data and metadata
                     emailsProcessed.textContent = processed;
                     totalEmails.textContent = total;
-                    currentSpeed.textContent = data.current_speed ? data.current_speed.toFixed(2) : '0';
-                    remainingEmails.textContent = data.remaining_emails || '0';
+                    
+                    // Calculate speed
+                    const now = Date.now();
+                    const timeDiff = (now - lastUpdate) / 1000; // Convert to seconds
+                    const emailsDiff = processed - lastProcessed;
+                    if (timeDiff > 0) {
+                        const speed = emailsDiff / timeDiff;
+                        currentSpeed.textContent = speed.toFixed(2);
+                        
+                        // Calculate remaining emails and ETA
+                        const remaining = total - processed;
+                        remainingEmails.textContent = remaining;
+                        
+                        if (speed > 0) {
+                            const etaSeconds = remaining / speed;
+                            const etaMinutes = Math.floor(etaSeconds / 60);
+                            const etaSecondsRemainder = Math.floor(etaSeconds % 60);
+                            eta.textContent = `${etaMinutes}:${etaSecondsRemainder.toString().padStart(2, '0')}`;
+                        }
+                    }
+                    
+                    lastUpdate = now;
+                    lastProcessed = processed;
 
                     // Update metadata display
                     updateLastFetchInfo();
@@ -355,6 +389,7 @@
                     eventSource.close();
                     fetchButton.disabled = false;
                     fetchButton.style.backgroundColor = '#0077b5';
+                    clearInterval(fetchUpdateInterval);
                 }
             } catch (error) {
                 console.error('Error parsing data:', error);
