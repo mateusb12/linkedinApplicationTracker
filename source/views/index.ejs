@@ -187,13 +187,22 @@
             <div><strong>Emails Found:</strong> <span id="last-fetch-count">0</span></div>
         </div>
         <p>After authentication, fetch your latest job application emails.</p>
-        <button id="fetch-button"
-                onclick="fetchEmails()"
-                <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"
-                <% } %>
-        >
-            Fetch Emails
-        </button>
+        <div class="tracking-controls">
+            <select id="fetch-amount" class="chart-control">
+                <option value="50">Last 50 emails</option>
+                <option value="100" selected>Last 100 emails</option>
+                <option value="250">Last 250 emails</option>
+                <option value="500">Last 500 emails</option>
+                <option value="1000">Last 1000 emails</option>
+                <option value="all">All emails</option>
+            </select>
+            <button id="fetch-button"
+                    onclick="fetchEmails()"
+                    <% if (!authenticated) { %>disabled style="background-color: grey; cursor: not-allowed;"<% } %>
+            >
+                Fetch Emails
+            </button>
+        </div>
         <progress id="progress-bar" value="0" max="100"></progress>
 
         <div class="progress-data">
@@ -287,6 +296,7 @@
     }
 
     function fetchEmails() {
+        const fetchAmount = document.getElementById('fetch-amount').value;
         document.querySelector('.progress-data').style.display = 'block';
         const progressBar = document.getElementById('progress-bar');
         const fetchButton = document.getElementById('fetch-button');
@@ -309,7 +319,7 @@
         fetchButton.disabled = true;
         fetchButton.style.backgroundColor = 'grey';
 
-        const eventSource = new EventSource('/fetch_emails');
+        const eventSource = new EventSource(`/fetch_emails?amount=${fetchAmount}`);
 
         eventSource.onmessage = function (e) {
             try {

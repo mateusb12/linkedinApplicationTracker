@@ -81,11 +81,22 @@ app.get('/fetch_emails', async (req, res) => {
     const gmailFetchService = require('./services/gmailFetchService');
     let emailCount = 0;
 
+    // Extract the 'amount' parameter from the query string
+    const amountParam = req.query.amount || '100'; // Default to '100' if not provided
+
+    let amount;
+    if (amountParam === 'all') {
+        amount = null; // Set to null or a very high number to indicate 'fetch all'
+    } else {
+        amount = parseInt(amountParam, 10);
+    }
+
     try {
-        for await (const update of gmailFetchService.fetchEmailsGenerator()) {
+        // Pass the 'amount' parameter to the fetchEmailsGenerator function
+        for await (const update of gmailFetchService.fetchEmailsGenerator(amount)) {
             res.write(`data: ${update}\n\n`);
-            
-            // Count processed emails
+
+            // Update email count for metadata
             const data = JSON.parse(update);
             if (data.emails_processed && data.total_emails) {
                 emailCount = data.total_emails;

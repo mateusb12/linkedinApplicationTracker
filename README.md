@@ -6,6 +6,8 @@ LinkedIn Application Tracker is a web application that helps you monitor your Li
 
 ## Features
 
+![Overview](pictures/7.png)
+
 ### Gmail Integration
 - **Secure Authentication**: OAuth 2.0 integration with Gmail API
 - **Email Analysis**: Fetches and analyzes LinkedIn application emails
