@@ -1,12 +1,35 @@
+const path = require('path');
+
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const { google } = require('googleapis');
 const authService = require('./gmailAuthService');
 const fs = require('fs').promises;
-const path = require('path');
+const crypto = require('crypto');
+const algorithm = 'aes-256-cbc';
+const key = process.env.ENCRYPTION_KEY;
+
+if (!key) {
+    throw new Error('Encryption key is not set. Please set the ENCRYPTION_KEY environment variable.');
+}
+
+if (Buffer.from(key).length !== 32) {
+    throw new Error('Encryption key must be 32 bytes (256 bits) long for aes-256-cbc.');
+}
+
+const winston = require('winston');
+
+const logger = winston.createLogger({
+    level: 'error',
+    format: winston.format.json(),
+    transports: [
+        new winston.transports.File({ filename: 'logs/error.log' }),
+        new winston.transports.Console()
+    ],
+});
 
 class GmailFetchService {
     async* fetchEmailsGenerator(amount) {
         try {
-            // Set amount to a large number if it's null or undefined
             amount = amount || Number.MAX_SAFE_INTEGER;
 
             const auth = authService.getOAuth2Client();
@@ -15,59 +38,53 @@ class GmailFetchService {
             let processed = 0;
             const startTime = Date.now();
             let nextPageToken = null;
-            let totalEmails = amount; // Initialize totalEmails
+            let totalEmails = amount;
 
-            // First, get the total number of available emails
             const initialResponse = await gmail.users.messages.list({
                 userId: 'me',
                 q: 'from:jobs-noreply@linkedin.com',
                 maxResults: 1
             });
 
-            // Update totalEmails to be the minimum of requested amount and available emails
             if (initialResponse.data.resultSizeEstimate !== undefined) {
                 totalEmails = Math.min(amount, initialResponse.data.resultSizeEstimate);
             }
 
             do {
-                // Calculate maxResults for this request
-                const maxResults = Math.min(500, amount - processed); // Gmail API allows up to 500
+                const maxResults = Math.min(500, amount - processed);
 
-                // Fetch emails with pagination
-                const response = await gmail.users.messages.list({
+                const response = await this.fetchWithRetry(() => gmail.users.messages.list({
                     userId: 'me',
                     q: 'from:jobs-noreply@linkedin.com',
-                    pageToken: nextPageToken || undefined, // Use the nextPageToken for pagination
-                    maxResults: maxResults // Adjust maxResults dynamically
-                });
+                    pageToken: nextPageToken || undefined,
+                    maxResults: maxResults
+                }));
 
                 const messages = response.data.messages || [];
-                nextPageToken = response.data.nextPageToken; // Update the nextPageToken
+                nextPageToken = response.data.nextPageToken;
 
-                // Process each email
                 for (const message of messages) {
-                    // Fetch email details
                     const emailData = await gmail.users.messages.get({
                         userId: 'me',
                         id: message.id
                     });
 
-                    // Add email to results array
-                    emailResults.push(emailData.data);
+                    const relevantData = {
+                        id: emailData.data.id,
+                        snippet: emailData.data.snippet,
+                        internalDate: emailData.data.internalDate
+                    };
+                    emailResults.push(relevantData);
 
                     processed++;
 
-                    // Calculate progress statistics
-                    const elapsedTime = (Date.now() - startTime) / 1000; // Convert to seconds
+                    const elapsedTime = (Date.now() - startTime) / 1000;
                     const currentSpeed = processed / elapsedTime;
-                    const remainingEmails = totalEmails - processed; // Use totalEmails here
-
-                    // Calculate remaining time and ETA
+                    const remainingEmails = totalEmails - processed;
                     const remainingSeconds = remainingEmails / (currentSpeed || 1);
                     const remainingTime = this.formatTime(remainingSeconds);
                     const eta = this.calculateETA(remainingSeconds);
 
-                    // Yield progress data
                     yield JSON.stringify({
                         emails_processed: processed,
                         total_emails: totalEmails,
@@ -78,31 +95,38 @@ class GmailFetchService {
                         message: 'Processing emails...'
                     });
 
-                    // Stop if we've fetched the desired amount
                     if (processed >= amount) {
                         break;
                     }
                 }
 
-                // Break the loop if we've fetched the desired amount
                 if (processed >= amount) {
                     break;
                 }
 
-            } while (nextPageToken && processed < amount); // Continue if there's a next page and we haven't fetched enough emails
+            } while (nextPageToken && processed < amount);
 
-            // Save all emails to JSON file
+            const dataToEncrypt = JSON.stringify(emailResults);
+            const iv = crypto.randomBytes(16);
+            const cipher = crypto.createCipheriv(algorithm, Buffer.from(key), iv);
+            let encrypted = cipher.update(dataToEncrypt);
+            encrypted = Buffer.concat([encrypted, cipher.final()]);
+
+            const encryptedData = {
+                iv: iv.toString('base64'),
+                data: encrypted.toString('base64')
+            };
+
             const resultsPath = path.join(__dirname, '../data/email_results.json');
 
             try {
                 await fs.mkdir(path.dirname(resultsPath), { recursive: true });
-                await fs.writeFile(resultsPath, JSON.stringify(emailResults, null, 2));
+                await fs.writeFile(resultsPath, JSON.stringify(encryptedData, null, 2));
             } catch (fileError) {
-                console.error('Error saving file:', fileError);
+                logger.error('Error saving file:', fileError);
                 throw fileError;
             }
 
-            // Send completion message
             yield JSON.stringify({
                 message: 'Email fetching completed.',
                 emails_processed: processed,
@@ -110,9 +134,24 @@ class GmailFetchService {
             });
 
         } catch (error) {
+            logger.error('Error in fetchEmailsGenerator:', error);
             yield JSON.stringify({
-                error: error.message
+                error: 'An unexpected error occurred while fetching emails. Please try again later.'
             });
+        }
+    }
+
+    async fetchWithRetry(fetchFunction, retries = 3, delay = 1000) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                return await fetchFunction();
+            } catch (error) {
+                if (attempt === retries) {
+                    throw error;
+                }
+                logger.warn(`Attempt ${attempt} failed. Retrying in ${delay}ms...`);
+                await new Promise(res => setTimeout(res, delay));
+            }
         }
     }
 
@@ -130,26 +169,59 @@ class GmailFetchService {
         if (!isFinite(remainingSeconds)) return 'Calculating...';
 
         const eta = new Date(Date.now() + (remainingSeconds * 1000));
-        return eta.toLocaleTimeString();
+        return eta.toLocaleTimeString('en-GB', { hour12: false });
+    }
+
+    async decryptEmailResults(encryptedFile) {
+        try {
+            const fileContent = await fs.readFile(encryptedFile, 'utf8');
+            const encryptedData = JSON.parse(fileContent);
+            
+            const iv = Buffer.from(encryptedData.iv, 'base64');
+            const encrypted = Buffer.from(encryptedData.data, 'base64');
+            
+            const decipher = crypto.createDecipheriv(algorithm, Buffer.from(key), iv);
+            let decrypted = decipher.update(encrypted);
+            decrypted = Buffer.concat([decrypted, decipher.final()]);
+            
+            const decryptedString = decrypted.toString('utf8');
+            const decryptedData = JSON.parse(decryptedString);
+            
+            if (!Array.isArray(decryptedData)) {
+                throw new Error('Decrypted data is not an array');
+            }
+            
+            return decryptedData;
+            
+        } catch (error) {
+            logger.error('Error in decryptEmailResults:', error);
+            throw error;
+        }
+    }
+
+    async displayEmailResults() {
+        try {
+            const resultsPath = path.join(__dirname, '../data/email_results.json');
+            const decryptedData = await this.decryptEmailResults(resultsPath);
+            
+            const formattedData = decryptedData.map(email => ({
+                id: email.id,
+                date: new Date(parseInt(email.internalDate)).toLocaleString(),
+                snippet: email.snippet
+            }));
+
+            const readablePath = path.join(__dirname, '../data/email_results_readable.json');
+            await fs.writeFile(
+                readablePath, 
+                JSON.stringify(formattedData, null, 2)
+            );
+            
+            return formattedData;
+        } catch (error) {
+            logger.error('Error displaying email results:', error);
+            throw error;
+        }
     }
 }
 
 module.exports = new GmailFetchService();
-
-// Add this block at the end of the file
-if (require.main === module) {
-    (async () => {
-        const gmailFetchService = new GmailFetchService();
-        let emailsFetched = 0;
-
-        for await (const progress of gmailFetchService.fetchEmailsGenerator(500)) {
-            const progressData = JSON.parse(progress);
-            if (progressData.emails_processed) {
-                emailsFetched = progressData.emails_processed;
-            }
-            console.log(progressData.message);
-        }
-
-        console.log(`Total emails fetched: ${emailsFetched}`);
-    })();
-}

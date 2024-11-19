@@ -2,9 +2,25 @@
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
+const winston = require('winston');
 
 const TOKEN_PATH = path.join(__dirname, '../tokens/token.json');
 const CREDENTIALS_PATH = path.join(__dirname, '../secrets/credentials.json');
+
+// Define OAuth 2.0 scopes with clear documentation
+const SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly' // Scope to read Gmail messages for fetching job-related emails
+];
+
+// Initialize Winston logger
+const logger = winston.createLogger({
+    level: 'error',
+    format: winston.format.json(),
+    transports: [
+        new winston.transports.File({ filename: 'logs/error.log' }),
+        new winston.transports.Console()
+    ],
+});
 
 class GmailAuthService {
     constructor() {
@@ -26,10 +42,10 @@ class GmailAuthService {
                     client_id, client_secret, this.redirectUri
                 );
             } else {
-                console.error('Error: Credentials file not found at:', CREDENTIALS_PATH);
+                logger.error('Credentials file not found at:', CREDENTIALS_PATH);
             }
         } catch (error) {
-            console.error('Error loading credentials:', error);
+            logger.error('Error loading credentials:', error);
         }
     }
 
@@ -44,35 +60,39 @@ class GmailAuthService {
 
     generateAuthUrl(state) {
         if (!this.oAuth2Client) {
-            console.error('OAuth2Client is not initialized');
+            logger.error('OAuth2Client is not initialized');
             return null;
         }
 
         try {
-            const url = this.oAuth2Client.generateAuthUrl({
+            return this.oAuth2Client.generateAuthUrl({
                 access_type: 'offline',
-                scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+                scope: SCOPES,
                 state: state,
                 prompt: 'consent'
             });
-            return url;
         } catch (error) {
-            console.error('Error generating auth URL:', error);
+            logger.error('Error generating auth URL:', error);
             return null;
         }
     }
 
     async getAndSaveTokens(code) {
-        const { tokens } = await this.oAuth2Client.getToken(code);
-        this.oAuth2Client.setCredentials(tokens);
-        
-        // Create tokens directory if it doesn't exist
-        const tokensDir = path.dirname(TOKEN_PATH);
-        if (!fs.existsSync(tokensDir)) {
-            fs.mkdirSync(tokensDir, { recursive: true });
+        try {
+            const { tokens } = await this.oAuth2Client.getToken(code);
+            this.oAuth2Client.setCredentials(tokens);
+            
+            // Create tokens directory if it doesn't exist
+            const tokensDir = path.dirname(TOKEN_PATH);
+            if (!fs.existsSync(tokensDir)) {
+                fs.mkdirSync(tokensDir, { recursive: true });
+            }
+            
+            fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+        } catch (error) {
+            logger.error('Error getting and saving tokens:', error);
+            throw error; // Re-throw to handle in calling function
         }
-        
-        fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
     }
 
     getOAuth2Client() {

@@ -6,6 +6,7 @@ const favicon = require('serve-favicon');
 const authService = require('./services/gmailAuthService');
 const ApplicationTrackingService = require('./services/applicationTrackingService');
 const fetchMetadataService = require('./services/fetchMetadataService');
+const winston = require('winston');
 
 const app = express();
 const port = 8080;
@@ -24,6 +25,16 @@ app.use(session({
     resave: false,
     saveUninitialized: true
 }));
+
+// Initialize Winston logger
+const logger = winston.createLogger({
+    level: 'error',
+    format: winston.format.json(),
+    transports: [
+        new winston.transports.File({ filename: 'logs/error.log' }),
+        new winston.transports.Console()
+    ],
+});
 
 // Routes
 app.get('/', (req, res) => {
@@ -48,15 +59,16 @@ app.get('/oauth2callback', async (req, res) => {
     const { code, state } = req.query;
 
     if (state !== req.session.state) {
-        return res.status(400).send('Invalid state parameter');
+        logger.error('Invalid state parameter');
+        return res.status(400).send('Invalid state parameter. Authentication failed.');
     }
     
     try {
         await authService.getAndSaveTokens(code);
         res.redirect('/');
     } catch (error) {
-        console.error('Error getting tokens:', error);
-        res.redirect('/');
+        logger.error('Error getting tokens:', error);
+        res.status(500).send('Authentication failed. Please try again.');
     }
 });
 
@@ -71,7 +83,7 @@ app.get('/fetch-metadata', async (req, res) => {
 
 app.get('/fetch_emails', async (req, res) => {
     if (!authService.isAuthenticated()) {
-        return res.status(401).send('Not authenticated');
+        return res.status(401).send('Not authenticated. Please authenticate with Gmail.');
     }
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -101,20 +113,12 @@ app.get('/fetch_emails', async (req, res) => {
         // Pass the 'amount' parameter to the fetchEmailsGenerator function
         for await (const update of gmailFetchService.fetchEmailsGenerator(amount)) {
             res.write(`data: ${update}\n\n`);
-
-            // Log the update being sent to the client
-
-            // Update email count for metadata
-            const data = JSON.parse(update);
-            if (data.emails_processed && data.total_emails) {
-                emailCount = data.total_emails;
-            }
         }
         // Update metadata after successful fetch
         await fetchMetadataService.updateMetadata(emailCount);
     } catch (error) {
-        console.error('Error fetching emails:', error);
-        res.write(`data: ${JSON.stringify({ error: 'Error fetching emails' })}\n\n`);
+        logger.error('Error fetching emails:', error);
+        res.write(`data: ${JSON.stringify({ error: 'An error occurred while fetching emails. Please try again later.' })}\n\n`);
     } finally {
         res.end();
     }
@@ -130,32 +134,76 @@ app.post('/generate-application-chart', async (req, res) => {
     }
 
     try {
+        console.log('\n=== STARTING CHART GENERATION ===');
         const tracker = new ApplicationTrackingService();
-        const viewType = req.body.viewType || 'week'; // Default to weekly view
+        const viewType = req.body.viewType || 'week';
         
-        // Load the email data
-        const data = await tracker.loadData('email_results.json');
-        const applicationCounts = tracker.countApplications(data);
+        // Load and decrypt the email data
+        console.log('Loading email data...');
+        const gmailFetchService = require('./services/gmailFetchService');
+        const resultsPath = path.join(__dirname, 'data/email_results.json');
+        
+        console.log('\n=== ATTEMPTING DECRYPTION ===');
+        console.log('Reading from:', resultsPath);
+        
+        try {
+            const decryptedData = await gmailFetchService.decryptEmailResults(resultsPath);
+            console.log('\nDecryption successful!');
+            console.log('Decrypted data type:', typeof decryptedData);
+            console.log('Is array?:', Array.isArray(decryptedData));
+            console.log('First item:', JSON.stringify(decryptedData[0], null, 2));
+            
+            const applicationCounts = tracker.countApplications(decryptedData);
+            const countsDict = tracker.aggregateCounts(applicationCounts);
+            const { labels, values, level } = tracker.determinePlotData(countsDict, viewType);
 
-        if (applicationCounts.size === 0) {
-            return res.status(404).json({ error: 'No application data found' });
+            // Generate the chart and save it
+            await tracker.generateChart(labels, values, level);
+            res.json({ success: true });
+            
+        } catch (decryptError) {
+            console.error('\n=== DECRYPTION ERROR DETAILS ===');
+            console.error('Error name:', decryptError.name);
+            console.error('Error message:', decryptError.message);
+            console.error('Stack trace:', decryptError.stack);
+            throw decryptError;
         }
-
-        const countsDict = tracker.aggregateCounts(applicationCounts);
-        const { labels, values, level } = tracker.determinePlotData(countsDict, viewType);
-
-        // Generate the chart and save it to public directory
-        await tracker.generateChart(labels, values, level);
-
-        res.json({ success: true });
     } catch (error) {
         console.error('Error generating chart:', error);
-        res.status(500).json({ error: 'Failed to generate chart' });
+        res.status(500).json({ error: 'Failed to generate chart: ' + error.message });
     }
 });
 
 app.get('/applications_chart.png', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'applications_chart.png'));
+});
+
+// Route to revoke OAuth access
+app.post('/revoke', async (req, res) => {
+    try {
+        const token = authService.oAuth2Client.credentials.access_token;
+        if (!token) {
+            return res.status(400).send('No access token found.');
+        }
+        await authService.oAuth2Client.revokeToken(token);
+        // Delete token.json
+        await fs.unlink(path.join(__dirname, 'tokens', 'token.json'));
+        res.send('Access revoked successfully.');
+    } catch (error) {
+        logger.error('Error revoking access:', error);
+        res.status(500).send('Failed to revoke access.');
+    }
+});
+
+// Route to delete stored email data
+app.delete('/delete-data', async (req, res) => {
+    try {
+        await fs.unlink(path.join(__dirname, 'data', 'email_results.json'));
+        res.send('Data deleted successfully.');
+    } catch (error) {
+        logger.error('Error deleting data:', error);
+        res.status(500).send('Failed to delete data.');
+    }
 });
 
 app.listen(port, () => {
