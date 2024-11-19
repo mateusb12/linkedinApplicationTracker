@@ -8,7 +8,7 @@ LinkedIn Application Tracker is a web application that helps you monitor your Li
 
 ![Overview](pictures/7.png)
 
-### 🔍 Gmail Integration
+### 📩 Gmail Integration
 - 🔒 **Secure Authentication**: OAuth 2.0 integration with Gmail API
 - 📩 **Email Analysis**: Fetches and analyzes LinkedIn application emails
 - ⏱️ **Real-time Progress**: Live progress tracking with speed, ETA, and completion statistics
@@ -16,7 +16,7 @@ LinkedIn Application Tracker is a web application that helps you monitor your Li
 - 🗓️ **Multiple Views**: Analyze data by day, week, month, quarter, or year
 - 🧮 **Metadata Tracking**: Keeps track of last fetch time and email counts
 
-### 🔍 Email Fetching Details
+### 📊 Email Fetching Details
 The **Gmail Integration** feature utilizes the Gmail API to securely fetch and analyze your LinkedIn job application emails. To perform this functionality, the application requests the following permissions from Google:
 
 - 🔑 **https://www.googleapis.com/auth/gmail.readonly**: This scope allows the application to read your Gmail messages and settings without modifying them.
@@ -37,10 +37,10 @@ The **Gmail Integration** feature utilizes the Gmail API to securely fetch and a
 - 🔒 **Credential Safety**: The `credentials.json` file and OAuth tokens are stored securely in the `source/secrets` and `tokens` directories, respectively.
 - 🔏 **Limited Scope**: By using only read-only access, the application minimizes the risk associated with handling user data.
 
-### 🔍 LinkedIn Scraping (In Development)
-- 🤖 **Automated Browser**: Selenium-based scraping of LinkedIn saved jobs
-- 🍪 **Cookie Management**: Persistent login through cookie storage
-- 📄 **Data Extraction**: Collects job titles, companies, and application dates
+### 🧹 LinkedIn Scraping (In Development)
+- **Automated Browser**: Selenium-based scraping of LinkedIn saved jobs
+- **Cookie Management**: Persistent login through cookie storage
+- **Data Extraction**: Collects job titles, companies, and application dates
 
 ## ✨ Getting Started
 
