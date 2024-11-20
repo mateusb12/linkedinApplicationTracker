@@ -28,6 +28,21 @@ const logger = winston.createLogger({
 });
 
 class GmailFetchService {
+    constructor() {
+        this.rateLimitConfig = {
+            maxRetries: 5,
+            baseDelay: 1000,
+            maxDelay: 16000
+        };
+    }
+
+    /**
+     * Fetches emails from Gmail using the jobs-noreply@linkedin.com filter
+     * @generator
+     * @param {number|null} amount - Maximum number of emails to fetch. If null, fetches all emails.
+     * @yields {string} JSON string containing progress information
+     * @throws {Error} If authentication or API calls fail
+     */
     async* fetchEmailsGenerator(amount) {
         try {
             amount = amount || Number.MAX_SAFE_INTEGER;
@@ -141,37 +156,12 @@ class GmailFetchService {
         }
     }
 
-    async fetchWithRetry(fetchFunction, retries = 3, delay = 1000) {
-        for (let attempt = 1; attempt <= retries; attempt++) {
-            try {
-                return await fetchFunction();
-            } catch (error) {
-                if (attempt === retries) {
-                    throw error;
-                }
-                logger.warn(`Attempt ${attempt} failed. Retrying in ${delay}ms...`);
-                await new Promise(res => setTimeout(res, delay));
-            }
-        }
-    }
-
-    formatTime(seconds) {
-        if (!isFinite(seconds)) return 'Calculating...';
-
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = Math.floor(seconds % 60);
-
-        return `${hours}h ${minutes}m ${secs}s`;
-    }
-
-    calculateETA(remainingSeconds) {
-        if (!isFinite(remainingSeconds)) return 'Calculating...';
-
-        const eta = new Date(Date.now() + (remainingSeconds * 1000));
-        return eta.toLocaleTimeString('en-GB', { hour12: false });
-    }
-
+    /**
+     * Decrypts stored email results using AES-256-CBC encryption
+     * @param {string} encryptedFile - Path to the encrypted file
+     * @returns {Promise<Array>} Decrypted email data
+     * @throws {Error} If decryption fails or data is invalid
+     */
     async decryptEmailResults(encryptedFile) {
         try {
             const fileContent = await fs.readFile(encryptedFile, 'utf8');
@@ -196,6 +186,54 @@ class GmailFetchService {
         } catch (error) {
             logger.error('Error in decryptEmailResults:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Formats time duration into human-readable string
+     * @param {number} seconds - Number of seconds to format
+     * @returns {string} Formatted time string (e.g., "2h 30m 45s")
+     */
+    formatTime(seconds) {
+        if (!isFinite(seconds)) return 'Calculating...';
+
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+
+        return `${hours}h ${minutes}m ${secs}s`;
+    }
+
+    calculateETA(remainingSeconds) {
+        if (!isFinite(remainingSeconds)) return 'Calculating...';
+
+        const eta = new Date(Date.now() + (remainingSeconds * 1000));
+        return eta.toLocaleTimeString('en-GB', { hour12: false });
+    }
+
+    async fetchWithRetry(fetchFunction, retries = this.rateLimitConfig.maxRetries) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                return await fetchFunction();
+            } catch (error) {
+                if (error.code === 429) {
+                    const delay = Math.min(
+                        this.rateLimitConfig.baseDelay * Math.pow(2, attempt - 1),
+                        this.rateLimitConfig.maxDelay
+                    );
+                    logger.warn(`Rate limit hit. Retrying in ${delay}ms... (Attempt ${attempt}/${retries})`);
+                    await new Promise(res => setTimeout(res, delay));
+                } else if (error.code === 401) {
+                    logger.error('Authentication token expired');
+                    throw new Error('Authentication expired. Please re-authenticate.');
+                } else if (attempt === retries) {
+                    logger.error('Max retries reached:', error);
+                    throw error;
+                } else {
+                    logger.warn(`Attempt ${attempt} failed. Retrying...`, error);
+                    await new Promise(res => setTimeout(res, 1000 * attempt));
+                }
+            }
         }
     }
 

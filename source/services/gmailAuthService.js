@@ -12,15 +12,48 @@ const SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly' // Scope to read Gmail messages for fetching job-related emails
 ];
 
-// Initialize Winston logger
+// Enhanced Winston logger configuration
 const logger = winston.createLogger({
-    level: 'error',
-    format: winston.format.json(),
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+    ),
     transports: [
-        new winston.transports.File({ filename: 'logs/error.log' }),
-        new winston.transports.Console()
+        // Error logs
+        new winston.transports.File({ 
+            filename: 'logs/error.log', 
+            level: 'error',
+            maxsize: 5242880, // 5MB
+            maxFiles: 5,
+        }),
+        // Info logs
+        new winston.transports.File({ 
+            filename: 'logs/combined.log',
+            maxsize: 5242880,
+            maxFiles: 5,
+        }),
+        // Console output for development
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize(),
+                winston.format.simple()
+            )
+        })
     ],
+    // Handle uncaught exceptions
+    exceptionHandlers: [
+        new winston.transports.File({ filename: 'logs/exceptions.log' })
+    ]
 });
+
+// Add debug logging for development
+if (process.env.NODE_ENV !== 'production') {
+    logger.add(new winston.transports.Console({
+        format: winston.format.simple(),
+        level: 'debug'
+    }));
+}
 
 class GmailAuthService {
     constructor() {

@@ -20,5 +20,10 @@
         "luxon": "^3.5.0",
         "serve-favicon": "^2.5.0",
         "winston": "^3.17.0"
+    },
+    "devDependencies": {
+        "chai": "^5.1.2",
+        "mocha": "^10.8.2",
+        "sinon": "^19.0.2"
     }
 }
