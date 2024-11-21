@@ -21,9 +21,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
-    secret: 'your_secret_key',
+    secret: process.env.SESSION_SECRET || 'your_secret_key',
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: true,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
 }));
 
 // Initialize Winston logger
@@ -34,6 +38,13 @@ const logger = winston.createLogger({
         new winston.transports.File({ filename: 'logs/error.log' }),
         new winston.transports.Console()
     ],
+});
+
+// Add this new middleware to handle CORS
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
 });
 
 // Routes
@@ -204,6 +215,25 @@ app.delete('/delete-data', async (req, res) => {
         logger.error('Error deleting data:', error);
         res.status(500).send('Failed to delete data.');
     }
+});
+
+// Add error handling middleware at the end of your middleware chain
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
+});
+
+// Add a catch-all route for undefined routes
+app.use((req, res) => {
+    res.status(404).send('Sorry, that route does not exist.');
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
+    });
 });
 
 app.listen(port, () => {
