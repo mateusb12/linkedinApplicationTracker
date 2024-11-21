@@ -4,7 +4,8 @@
     "description": "Gmail analyzer with LinkedIn application tracking capabilities",
     "main": "source/app.js",
     "scripts": {
-        "start": "node source/app.js"
+        "start": "node source/app.js",
+        "build": "echo 'Build complete!'"
     },
     "dependencies": {
         "@google-cloud/local-auth": "^3.0.1",
