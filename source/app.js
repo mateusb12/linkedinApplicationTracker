@@ -252,6 +252,10 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-});
+if (process.env.VERCEL) {
+    module.exports = app; // Export for Vercel
+} else {
+    app.listen(port, () => {
+        console.log(`Server running at http://localhost:${port}`);
+    });
+}
