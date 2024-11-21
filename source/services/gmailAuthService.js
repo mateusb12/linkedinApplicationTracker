@@ -75,7 +75,18 @@ class GmailAuthService {
                     client_id, client_secret, this.redirectUri
                 );
             } else {
-                logger.error('Credentials file not found at:', CREDENTIALS_PATH);
+                // Attempt to load credentials from environment variables
+                const client_id = process.env.CLIENT_ID;
+                const client_secret = process.env.CLIENT_SECRET;
+
+                if (client_id && client_secret) {
+                    logger.info('Using credentials from environment variables');
+                    this.oAuth2Client = new google.auth.OAuth2(
+                        client_id, client_secret, this.redirectUri
+                    );
+                } else {
+                    logger.error('No credentials found in file or environment variables');
+                }
             }
         } catch (error) {
             logger.error('Error loading credentials:', error);
