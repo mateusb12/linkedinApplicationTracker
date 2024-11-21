@@ -2,9 +2,9 @@
     "name": "gmail-analyzer",
     "version": "1.0.0",
     "description": "Gmail analyzer with LinkedIn application tracking capabilities",
-    "main": "source/scripts/trackApplications.js",
+    "main": "source/app.js",
     "scripts": {
-        "start": "node source/scripts/trackApplications.js"
+        "start": "node source/app.js"
     },
     "dependencies": {
         "@google-cloud/local-auth": "^3.0.1",
