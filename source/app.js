@@ -9,7 +9,7 @@ const fetchMetadataService = require('./services/fetchMetadataService');
 const winston = require('winston');
 
 const app = express();
-const port = 8080;
+const port = process.env.PORT || 8080;
 
 // Middleware setup
 app.set('views', path.join(__dirname, 'views'));
@@ -42,7 +42,14 @@ const logger = winston.createLogger({
 
 // Add this new middleware to handle CORS
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    const allowedOrigins = ['http://localhost:8080'];
+    if (process.env.VERCEL_URL) {
+        allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+    }
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
@@ -233,6 +240,15 @@ app.get('/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV
+    });
+});
+
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        vercel: process.env.VERCEL === '1'
     });
 });
 
