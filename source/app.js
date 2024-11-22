@@ -12,9 +12,6 @@ const app = express();
 
 // Middleware setup
 app.set('views', path.join(__dirname, 'views'));
-app.use('/favicon.ico', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/images/email.png'));
-});
 app.use('/static', express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 
@@ -83,7 +80,7 @@ app.get('/oauth2callback', async (req, res) => {
         logger.error('Invalid state parameter');
         return res.status(400).send('Invalid state parameter. Authentication failed.');
     }
-    
+
     try {
         await authService.getAndSaveTokens(code);
         res.redirect('/');
@@ -97,7 +94,7 @@ app.get('/fetch-metadata', async (req, res) => {
     if (!authService.isAuthenticated()) {
         return res.status(401).json({ error: 'Not authenticated' });
     }
-    
+
     const metadata = await fetchMetadataService.getMetadata();
     res.json(metadata);
 });
@@ -158,22 +155,22 @@ app.post('/generate-application-chart', async (req, res) => {
         console.log('\n=== STARTING CHART GENERATION ===');
         const tracker = new ApplicationTrackingService();
         const viewType = req.body.viewType || 'week';
-        
+
         // Load and decrypt the email data
         console.log('Loading email data...');
         const gmailFetchService = require('./services/gmailFetchService');
         const resultsPath = path.join(__dirname, 'data/email_results.json');
-        
+
         console.log('\n=== ATTEMPTING DECRYPTION ===');
         console.log('Reading from:', resultsPath);
-        
+
         try {
             const decryptedData = await gmailFetchService.decryptEmailResults(resultsPath);
             console.log('\nDecryption successful!');
             console.log('Decrypted data type:', typeof decryptedData);
             console.log('Is array?:', Array.isArray(decryptedData));
             console.log('First item:', JSON.stringify(decryptedData[0], null, 2));
-            
+
             const applicationCounts = tracker.countApplications(decryptedData);
             const countsDict = tracker.aggregateCounts(applicationCounts);
             const { labels, values, level } = tracker.determinePlotData(countsDict, viewType);
@@ -181,7 +178,7 @@ app.post('/generate-application-chart', async (req, res) => {
             // Generate the chart and save it
             await tracker.generateChart(labels, values, level);
             res.json({ success: true });
-            
+
         } catch (decryptError) {
             console.error('\n=== DECRYPTION ERROR DETAILS ===');
             console.error('Error name:', decryptError.name);
