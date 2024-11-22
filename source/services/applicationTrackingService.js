@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const { DateTime } = require('luxon');
 const Chart = require('chart.js/auto');
-const { createCanvas } = require('canvas');
+const { createCanvas } = require('@napi-rs/canvas');
 const path = require('path');
 
 class ApplicationTrackingService {

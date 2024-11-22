@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "@google-cloud/local-auth": "^3.0.1",
-        "canvas": "^2.11.2",
+        "@napi-rs/canvas": "^0.1.44",
         "chart.js": "^4.4.6",
         "compression": "^1.7.5",
         "dotenv": "^16.4.5",
