@@ -34,10 +34,24 @@ const logger = winston.createLogger({
     level: 'error',
     format: winston.format.json(),
     transports: [
-        new winston.transports.File({ filename: 'logs/error.log' }),
         new winston.transports.Console()
     ],
 });
+
+// Only add file logging in development environment
+if (process.env.NODE_ENV === 'development') {
+    try {
+        // Create logs directory if it doesn't exist
+        if (!fs.existsSync(path.join(__dirname, 'logs'))) {
+            fs.mkdirSync(path.join(__dirname, 'logs'));
+        }
+        logger.add(new winston.transports.File({ 
+            filename: path.join(__dirname, 'logs', 'error.log')
+        }));
+    } catch (error) {
+        console.error('Failed to setup file logging:', error);
+    }
+}
 
 // Add this new middleware to handle CORS
 app.use((req, res, next) => {
