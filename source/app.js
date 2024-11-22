@@ -9,24 +9,26 @@ const fetchMetadataService = require('./services/fetchMetadataService');
 const winston = require('winston');
 
 const app = express();
-const port = process.env.PORT || 8080;
 
 // Middleware setup
 app.set('views', path.join(__dirname, 'views'));
-app.use(favicon(path.join(__dirname, '../public/images/email.png')));
-app.use(express.static(path.join(__dirname, '../public')));
-app.set('view engine', 'ejs'); // Using EJS as template engine
+app.use('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/images/email.png'));
+});
+app.use('/static', express.static(path.join(__dirname, 'public')));
+app.set('view engine', 'ejs');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Simplified session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your_secret_key',
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        secure: process.env.VERCEL_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
@@ -42,7 +44,7 @@ const logger = winston.createLogger({
 
 // Add this new middleware to handle CORS
 app.use((req, res, next) => {
-    const allowedOrigins = ['http://localhost:8080'];
+    const allowedOrigins = ['http://localhost:3000'];
     if (process.env.VERCEL_URL) {
         allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
     }
@@ -50,6 +52,7 @@ app.use((req, res, next) => {
     if (allowedOrigins.includes(origin)) {
         res.header('Access-Control-Allow-Origin', origin);
     }
+    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
@@ -193,7 +196,7 @@ app.post('/generate-application-chart', async (req, res) => {
 });
 
 app.get('/applications_chart.png', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'applications_chart.png'));
+    res.sendFile(path.join(__dirname, 'data', 'applications_chart.png'));
 });
 
 // Route to revoke OAuth access
@@ -252,9 +255,18 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-if (process.env.VERCEL) {
-    module.exports = app; // Export for Vercel
-} else {
+app.get('/_health', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        vercel: true
+    });
+});
+
+module.exports = app;
+
+if (process.env.NODE_ENV === 'development') {
+    const port = process.env.PORT || 3000;
     app.listen(port, () => {
         console.log(`Server running at http://localhost:${port}`);
     });

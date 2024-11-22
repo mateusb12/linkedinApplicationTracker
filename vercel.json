@@ -1,3 +1,34 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "version": 2,
+  "builds": [
+    {
+      "src": "source/app.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/favicon.ico",
+      "dest": "/source/app.js"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/source/public/$1"
+    },
+    {
+      "src": "/_health",
+      "dest": "/source/app.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/source/app.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/source/app.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

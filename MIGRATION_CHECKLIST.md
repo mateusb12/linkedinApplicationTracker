@@ -176,9 +176,35 @@
 - [ ] Create Vercel configuration:
   ```json:vercel.json
   {
-    "buildCommand": "npm run build",
-    "devCommand": "npm run dev",
-    "installCommand": "npm install"
+    "version": 2,
+    "builds": [
+      {
+        "src": "source/app.js",
+        "use": "@vercel/node"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/favicon.ico",
+        "dest": "/source/app.js"
+      },
+      {
+        "src": "/static/(.*)",
+        "dest": "/source/public/$1"
+      },
+      {
+        "src": "/_health",
+        "dest": "/source/app.js"
+      },
+      {
+        "src": "/api/(.*)",
+        "dest": "/source/app.js"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "/source/app.js"
+      }
+    ]
   }
   ```
 
@@ -204,3 +230,25 @@
   - [ ] Email fetching with progress
   - [ ] Chart generation
   - [ ] Data persistence
+
+- [ ] Verify server entry point location:
+  - Ensure main server file exists at source/app.js with:
+    - Proper Express initialization
+    - Error handling middleware
+    - Proper module exports
+  - Verify vercel.json configuration:
+    - Correct src path in builds: "source/app.js"
+    - Route handling for static files: "/static/(.*)"
+    - Route handling for API endpoints: "/api/(.*)"
+    - Default route handling: "/(.*)"
+  - Make sure the file is not listed in .vercelignore
+  - Test local deployment with `vercel dev`
+  - Check server logs for connection errors
+
+- [ ] Verify static file handling:
+  - Remove serve-favicon middleware
+  - Add direct route handler for favicon.ico
+  - Verify static file paths:
+    - /favicon.ico -> public/images/email.png
+    - /static/* -> public/*
+  - Test static file access in development and production
