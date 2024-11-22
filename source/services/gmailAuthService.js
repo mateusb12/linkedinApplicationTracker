@@ -12,47 +12,30 @@ const SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly' // Scope to read Gmail messages for fetching job-related emails
 ];
 
-// Enhanced Winston logger configuration
+// Initialize Winston logger for Gmail Auth Service
 const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
+    level: 'error',
+    format: winston.format.json(),
     transports: [
-        // Error logs
-        new winston.transports.File({ 
-            filename: 'logs/error.log', 
-            level: 'error',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5,
-        }),
-        // Info logs
-        new winston.transports.File({ 
-            filename: 'logs/combined.log',
-            maxsize: 5242880,
-            maxFiles: 5,
-        }),
-        // Console output for development
-        new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize(),
-                winston.format.simple()
-            )
-        })
-    ],
-    // Handle uncaught exceptions
-    exceptionHandlers: [
-        new winston.transports.File({ filename: 'logs/exceptions.log' })
+        new winston.transports.Console()
     ]
 });
 
-// Add debug logging for development
-if (process.env.NODE_ENV !== 'production') {
-    logger.add(new winston.transports.Console({
-        format: winston.format.simple(),
-        level: 'debug'
-    }));
+// Only add file logging in development environment
+if (process.env.NODE_ENV === 'development') {
+    try {
+        const logsDir = path.join(__dirname, '..', 'logs');
+        
+        if (!fs.existsSync(logsDir)) {
+            fs.mkdirSync(logsDir, { recursive: true });
+        }
+        
+        logger.add(new winston.transports.File({ 
+            filename: path.join(logsDir, 'gmail-auth.log')
+        }));
+    } catch (error) {
+        console.error('Failed to setup file logging in Gmail Auth Service:', error);
+    }
 }
 
 class GmailAuthService {
