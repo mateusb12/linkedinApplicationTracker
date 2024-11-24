@@ -7,6 +7,7 @@ const authService = require('./services/gmailAuthService');
 const ApplicationTrackingService = require('./services/applicationTrackingService');
 const fetchMetadataService = require('./services/fetchMetadataService');
 const winston = require('winston');
+const crypto = require('crypto');
 
 const app = express();
 
@@ -18,16 +19,22 @@ app.set('view engine', 'ejs');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Simplified session configuration
+// Update the session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your_secret_key',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.VERCEL_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000
-    }
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: 'lax'
+    },
+    proxy: process.env.NODE_ENV === 'production'
 }));
+
+// Add this right after your session middleware
+app.set('trust proxy', 1);
 
 // Initialize Winston logger
 const logger = winston.createLogger({
@@ -78,32 +85,122 @@ app.get('/', (req, res) => {
 });
 
 app.get('/auth/gmail', (req, res) => {
-    console.log('Starting auth process...');
-    const state = Math.random().toString(36).substring(7);
+    console.log('\n=== Starting OAuth Process ===');
+    
+    // Generate state and log it
+    const state = crypto.randomBytes(32).toString('hex');
+    console.log('1. Generated State:', state.substring(0, 10) + '...');
+    
+    // Generate auth URL
     const authUrl = authService.generateAuthUrl(state);
-    console.log('Auth URL generated:', authUrl);
+    console.log('2. Auth URL generated:', authUrl ? 'Success' : 'Failed');
+    
     if (!authUrl) {
+        logger.error('Failed to generate auth URL');
         return res.status(500).send('Failed to generate auth URL');
     }
+
+    // Save state to session
     req.session.state = state;
-    res.redirect(authUrl);
+    req.session.cookie.created = new Date();
+    
+    console.log('3. Session Details:', {
+        sessionID: req.sessionID,
+        cookie: {
+            maxAge: req.session.cookie.maxAge,
+            secure: req.session.cookie.secure,
+            httpOnly: req.session.cookie.httpOnly
+        }
+    });
+
+    // Ensure session is saved before redirect
+    req.session.save((err) => {
+        if (err) {
+            logger.error('Failed to save session:', err);
+            return res.status(500).send('Error starting authentication process');
+        }
+        console.log('4. Session saved successfully, redirecting to Google');
+        res.redirect(authUrl);
+    });
 });
 
 app.get('/oauth2callback', async (req, res) => {
-    console.log('Callback route hit!', { query: req.query });
+    console.log('\n=== OAuth Callback Debug Info ===');
+    console.log('1. Request Query Parameters:', {
+        state: req.query.state,
+        code: req.query.code ? 'Present' : 'Missing',
+        fullQuery: req.query
+    });
+    
+    console.log('2. Session Information:', {
+        sessionExists: req.session ? 'Yes' : 'No',
+        sessionState: req.session?.state,
+        sessionID: req.sessionID,
+        cookie: req.session?.cookie
+    });
+
+    console.log('3. Request Headers:', {
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        host: req.headers.host
+    });
+
     const { code, state } = req.query;
 
+    // Detailed validation checks
+    if (!state) {
+        logger.error('State parameter missing in request');
+        return res.status(400).send('Error: No state parameter received in callback');
+    }
+
+    if (!req.session) {
+        logger.error('No session found in request');
+        return res.status(400).send('Error: No session found. Please try authenticating again');
+    }
+
+    if (!req.session.state) {
+        logger.error('No state found in session', {
+            sessionID: req.sessionID,
+            sessionContent: req.session
+        });
+        return res.status(400).send('Error: No state found in session. Please try authenticating again');
+    }
+
     if (state !== req.session.state) {
-        logger.error('Invalid state parameter');
-        return res.status(400).send('Invalid state parameter. Authentication failed.');
+        logger.error('State parameter mismatch', {
+            receivedState: state,
+            sessionState: req.session.state,
+            sessionID: req.sessionID,
+            timeDifference: new Date() - new Date(req.session.cookie.created)
+        });
+        return res.status(400).send(`Error: State mismatch. 
+            Received: ${state.substring(0, 10)}..., 
+            Expected: ${req.session.state.substring(0, 10)}...`);
     }
 
     try {
+        console.log('4. Attempting to get tokens with code');
         await authService.getAndSaveTokens(code);
-        res.redirect('/');
+        console.log('5. Successfully obtained and saved tokens');
+        
+        // Clear the state from session after successful use
+        delete req.session.state;
+        
+        // Ensure session changes are saved before redirect
+        req.session.save((err) => {
+            if (err) {
+                logger.error('Error saving session after OAuth:', err);
+            }
+            console.log('6. Redirecting to home page');
+            res.redirect('/');
+        });
     } catch (error) {
-        logger.error('Error getting tokens:', error);
-        res.status(500).send('Authentication failed. Please try again.');
+        logger.error('Token exchange failed:', {
+            error: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).send(`Authentication failed: ${error.message}. Please try again.`);
     }
 });
 
