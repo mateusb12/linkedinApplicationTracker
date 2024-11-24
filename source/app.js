@@ -2,7 +2,6 @@ const express = require('express');
 const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
-const favicon = require('serve-favicon');
 const authService = require('./services/gmailAuthService');
 const ApplicationTrackingService = require('./services/applicationTrackingService');
 const fetchMetadataService = require('./services/fetchMetadataService');
