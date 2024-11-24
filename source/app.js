@@ -179,20 +179,14 @@ app.get('/oauth2callback', async (req, res) => {
 
     try {
         console.log('4. Attempting to get tokens with code');
-        await authService.getAndSaveTokens(code);
-        console.log('5. Successfully obtained and saved tokens');
+        const tokens = await authService.getTokens(code);
+        console.log('5. Successfully obtained tokens');
         
         // Clear the state from session after successful use
         delete req.session.state;
         
-        // Ensure session changes are saved before redirect
-        req.session.save((err) => {
-            if (err) {
-                logger.error('Error saving session after OAuth:', err);
-            }
-            console.log('6. Redirecting to home page');
-            res.redirect('/');
-        });
+        // Send tokens to client side
+        res.redirect(`/?tokens=${encodeURIComponent(JSON.stringify(tokens))}`);
     } catch (error) {
         logger.error('Token exchange failed:', {
             error: error.message,
@@ -380,6 +374,18 @@ app.get('/_health', (req, res) => {
         timestamp: new Date().toISOString(),
         vercel: true
     });
+});
+
+// Add this new route to handle token setting
+app.post('/set-tokens', express.json(), (req, res) => {
+    try {
+        const tokens = req.body;
+        authService.setTokens(tokens);
+        res.status(200).json({ success: true });
+    } catch (error) {
+        logger.error('Error setting tokens:', error);
+        res.status(500).json({ error: 'Failed to set tokens' });
+    }
 });
 
 module.exports = app;

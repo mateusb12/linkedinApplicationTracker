@@ -175,6 +175,7 @@
             <button id="auth-button" onclick="window.location.href='/auth/gmail'">Authenticate with Gmail</button>
         <% } else { %>
             <p style="color: green;">Authenticated with Gmail!</p>
+            <button onclick="logout()" style="background-color: #dc3545;">Logout</button>
         <% } %>
     </section>
 
@@ -254,6 +255,42 @@
     <p>Developed by <a href="https://mateusb12.github.io/mateus_portfolio/">Mateus</a></p>
 </footer>
 <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokens = urlParams.get('tokens');
+        
+        if (tokens) {
+            localStorage.setItem('gmail_tokens', tokens);
+            window.history.replaceState({}, document.title, '/');
+        }
+
+        const storedTokens = localStorage.getItem('gmail_tokens');
+        if (storedTokens) {
+            fetch('/set-tokens', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: storedTokens
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('Failed to set tokens on server');
+                    localStorage.removeItem('gmail_tokens');
+                }
+            }).catch(error => {
+                console.error('Error setting tokens:', error);
+                localStorage.removeItem('gmail_tokens');
+            });
+        }
+
+        updateLastFetchInfo();
+    });
+
+    function logout() {
+        localStorage.removeItem('gmail_tokens');
+        window.location.reload();
+    }
+
     let fetchStartTime = null;
     let fetchUpdateInterval = null;
     let eventSource = null;
@@ -465,10 +502,6 @@
             button.style.backgroundColor = '#0077b5';
         }
     }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        updateLastFetchInfo();
-    });
 </script>
 </body>
 </html>
