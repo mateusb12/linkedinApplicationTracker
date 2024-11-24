@@ -36,7 +36,7 @@ app.use(session({
 // Add this right after your session middleware!
 app.set('trust proxy', 1);
 
-// Initialize Winston logger
+// Initialize Winston logger!
 const logger = winston.createLogger({
     level: 'error',
     format: winston.format.json(),
