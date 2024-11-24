@@ -33,7 +33,7 @@ app.use(session({
     proxy: process.env.NODE_ENV === 'production'
 }));
 
-// Add this right after your session middleware
+// Add this right after your session middleware!
 app.set('trust proxy', 1);
 
 // Initialize Winston logger
