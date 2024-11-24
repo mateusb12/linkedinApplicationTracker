@@ -1,5 +1,4 @@
 const express = require('express');
-const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
 const authService = require('./services/gmailAuthService');
@@ -7,194 +6,117 @@ const ApplicationTrackingService = require('./services/applicationTrackingServic
 const fetchMetadataService = require('./services/fetchMetadataService');
 const winston = require('winston');
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 
-// Middleware setup
+// Basic middleware setup
 app.set('views', path.join(__dirname, 'views'));
 app.use('/static', express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-// Update the session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your_secret_key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
-        sameSite: 'lax'
-    },
-    proxy: process.env.NODE_ENV === 'production'
-}));
-
-// Add this right after your session middleware!
-app.set('trust proxy', 1);
-
-// Initialize Winston logger!
-const logger = winston.createLogger({
-    level: 'error',
-    format: winston.format.json(),
-    transports: [
-        new winston.transports.Console()
-    ],
-});
-
-// Only add file logging in development environment
-if (process.env.NODE_ENV === 'development') {
-    try {
-        // Create logs directory if it doesn't exist
-        if (!fs.existsSync(path.join(__dirname, 'logs'))) {
-            fs.mkdirSync(path.join(__dirname, 'logs'));
-        }
-        logger.add(new winston.transports.File({ 
-            filename: path.join(__dirname, 'logs', 'error.log')
-        }));
-    } catch (error) {
-        console.error('Failed to setup file logging:', error);
-    }
-}
-
-// Add this new middleware to handle CORS
-app.use((req, res, next) => {
-    const allowedOrigins = ['http://localhost:3000'];
-    if (process.env.VERCEL_URL) {
-        allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
-    }
-    if (process.env.PRODUCTION_URL) {
-        allowedOrigins.push(process.env.PRODUCTION_URL);
-    }
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-});
-
-// Routes
-app.get('/', (req, res) => {
-    const authenticated = authService.isAuthenticated();
-    res.render('index', { authenticated });
-});
-
+// Update the auth route to use a simpler approach
 app.get('/auth/gmail', (req, res) => {
     console.log('\n=== Starting OAuth Process ===');
     
-    // Generate state and log it
+    // Generate state
     const state = crypto.randomBytes(32).toString('hex');
     console.log('1. Generated State:', state.substring(0, 10) + '...');
     
     // Generate auth URL
     const authUrl = authService.generateAuthUrl(state);
-    console.log('2. Auth URL generated:', authUrl ? 'Success' : 'Failed');
+    console.log('2. Auth URL generated:', authUrl);
+    console.log('3. Redirect URI configured as:', authService.redirectUri);
     
     if (!authUrl) {
-        logger.error('Failed to generate auth URL');
         return res.status(500).send('Failed to generate auth URL');
     }
 
-    // Save state to session
-    req.session.state = state;
-    req.session.cookie.created = new Date();
-    
-    console.log('3. Session Details:', {
-        sessionID: req.sessionID,
-        cookie: {
-            maxAge: req.session.cookie.maxAge,
-            secure: req.session.cookie.secure,
-            httpOnly: req.session.cookie.httpOnly
-        }
+    // Store state in a cookie instead of session
+    res.cookie('oauth_state', state, { 
+        httpOnly: true, 
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 5 * 60 * 1000 // 5 minutes
     });
 
-    // Ensure session is saved before redirect
-    req.session.save((err) => {
-        if (err) {
-            logger.error('Failed to save session:', err);
-            return res.status(500).send('Error starting authentication process');
-        }
-        console.log('4. Session saved successfully, redirecting to Google');
-        res.redirect(authUrl);
-    });
+    res.redirect(authUrl);
 });
 
+// Update the callback route
 app.get('/oauth2callback', async (req, res) => {
-    console.log('\n=== OAuth Callback Debug Info ===');
-    console.log('1. Request Query Parameters:', {
-        state: req.query.state,
-        code: req.query.code ? 'Present' : 'Missing',
-        fullQuery: req.query
-    });
-    
-    console.log('2. Session Information:', {
-        sessionExists: req.session ? 'Yes' : 'No',
-        sessionState: req.session?.state,
-        sessionID: req.sessionID,
-        cookie: req.session?.cookie
-    });
-
-    console.log('3. Request Headers:', {
-        origin: req.headers.origin,
-        referer: req.headers.referer,
-        host: req.headers.host
+    console.log('OAuth callback received:', {
+        hasCode: !!req.query.code,
+        hasState: !!req.query.state,
+        hasCookie: !!req.cookies.oauth_state
     });
 
     const { code, state } = req.query;
+    const savedState = req.cookies.oauth_state;
 
-    // Detailed validation checks
-    if (!state) {
-        logger.error('State parameter missing in request');
-        return res.status(400).send('Error: No state parameter received in callback');
-    }
-
-    if (!req.session) {
-        logger.error('No session found in request');
-        return res.status(400).send('Error: No session found. Please try authenticating again');
-    }
-
-    if (!req.session.state) {
-        logger.error('No state found in session', {
-            sessionID: req.sessionID,
-            sessionContent: req.session
-        });
-        return res.status(400).send('Error: No state found in session. Please try authenticating again');
-    }
-
-    if (state !== req.session.state) {
-        logger.error('State parameter mismatch', {
+    if (!state || !savedState || state !== savedState) {
+        console.error('State mismatch or missing:', {
             receivedState: state,
-            sessionState: req.session.state,
-            sessionID: req.sessionID,
-            timeDifference: new Date() - new Date(req.session.cookie.created)
+            savedState: savedState
         });
-        return res.status(400).send(`Error: State mismatch. 
-            Received: ${state.substring(0, 10)}..., 
-            Expected: ${req.session.state.substring(0, 10)}...`);
+        return res.status(400).send('Invalid state parameter. Please try again.');
     }
 
     try {
-        console.log('4. Attempting to get tokens with code');
+        console.log('Getting tokens from Google...');
         const tokens = await authService.getTokens(code);
-        console.log('5. Successfully obtained tokens');
-        
-        // Clear the state from session after successful use
-        delete req.session.state;
-        
-        // Send tokens to client side
-        res.redirect(`/?tokens=${encodeURIComponent(JSON.stringify(tokens))}`);
-    } catch (error) {
-        logger.error('Token exchange failed:', {
-            error: error.message,
-            stack: error.stack,
-            code: error.code
+        console.log('Tokens received:', {
+            access_token: tokens.access_token ? 'exists' : 'missing',
+            refresh_token: tokens.refresh_token ? 'exists' : 'missing',
+            scope: tokens.scope,
+            token_type: tokens.token_type,
+            expiry_date: tokens.expiry_date
         });
-        res.status(500).send(`Authentication failed: ${error.message}. Please try again.`);
+        
+        // Clear the state cookie
+        res.clearCookie('oauth_state');
+        
+        // Set the tokens in the auth service immediately
+        authService.setTokens(tokens);
+        
+        // Send a simple HTML page that stores tokens and redirects
+        res.send(`
+            <html>
+                <body>
+                    <script>
+                        try {
+                            const tokens = ${JSON.stringify(tokens)};
+                            console.log('Storing tokens:', {
+                                access_token: tokens.access_token ? 'exists' : 'missing',
+                                refresh_token: tokens.refresh_token ? 'exists' : 'missing',
+                                scope: tokens.scope,
+                                token_type: tokens.token_type,
+                                expiry_date: tokens.expiry_date
+                            });
+                            window.localStorage.setItem('gmail_tokens', JSON.stringify(tokens));
+                            window.location.href = '/';
+                        } catch (error) {
+                            console.error('Error storing tokens:', error);
+                            window.location.href = '/?error=token_storage_failed';
+                        }
+                    </script>
+                    <p>Authentication successful! Redirecting...</p>
+                </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Token exchange failed:', error);
+        res.status(500).send(`Authentication failed: ${error.message}`);
     }
+});
+
+// Routes
+app.get('/', (req, res) => {
+    // Don't check authentication here since it's managed client-side
+    res.render('index', { authenticated: false });
 });
 
 app.get('/fetch-metadata', async (req, res) => {
@@ -303,29 +225,41 @@ app.get('/applications_chart.png', (req, res) => {
     res.sendFile(path.join(__dirname, 'data', 'applications_chart.png'));
 });
 
-// Route to revoke OAuth access
+// Update the revoke route
 app.post('/revoke', async (req, res) => {
     try {
-        const token = authService.oAuth2Client.credentials.access_token;
-        if (!token) {
-            return res.status(400).send('No access token found.');
+        const storedTokens = req.body.tokens;
+        if (!storedTokens || !storedTokens.access_token) {
+            return res.status(400).json({ 
+                error: 'No access token provided in request' 
+            });
         }
-        await authService.oAuth2Client.revokeToken(token);
-        
-        if (process.env.NODE_ENV === 'production') {
-            // In production, clear the token from memory
-            authService.token = null;
-            // If using environment variable
-            // delete process.env.OAUTH_TOKEN;
-        } else {
-            // In development, delete the token file
-            await fs.unlink(path.join(__dirname, 'tokens', 'token.json'));
+
+        const oauth2Client = authService.getOAuth2Client();
+        oauth2Client.setCredentials(storedTokens);
+
+        try {
+            // Try to revoke the token with Google
+            await oauth2Client.revokeToken(storedTokens.access_token);
+        } catch (revokeError) {
+            console.warn('Warning: Error revoking token with Google:', revokeError);
+            // Continue anyway as we want to clear local state
         }
         
-        res.send('Access revoked successfully.');
+        // Clear credentials from the OAuth client
+        authService.clearCredentials();
+        
+        res.status(200).json({ 
+            success: true, 
+            message: 'Access revoked successfully' 
+        });
+        
     } catch (error) {
-        logger.error('Error revoking access:', error);
-        res.status(500).send('Failed to revoke access.');
+        console.error('Error in revoke endpoint:', error);
+        res.status(500).json({ 
+            error: 'Failed to revoke access',
+            details: error.message 
+        });
     }
 });
 
@@ -340,13 +274,64 @@ app.delete('/delete-data', async (req, res) => {
     }
 });
 
-// Add error handling middleware at the end of your middleware chain
+// Move this BEFORE any error handlers and catch-all routes
+app.post('/set-tokens', express.json(), (req, res) => {
+    try {
+        console.log('Received token setting request');
+        
+        if (!req.body || !req.body.access_token) {
+            console.error('Invalid token data received:', req.body);
+            return res.status(400).json({ 
+                error: 'Invalid token data',
+                details: 'Token data must include access_token'
+            });
+        }
+
+        console.log('Setting tokens in auth service');
+        authService.setTokens(req.body);
+        
+        // Verify the tokens were set correctly
+        if (!authService.isAuthenticated()) {
+            console.error('Token setting failed verification');
+            return res.status(500).json({ 
+                error: 'Token setting failed verification' 
+            });
+        }
+
+        console.log('Tokens set successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Tokens set successfully'
+        });
+    } catch (error) {
+        console.error('Error setting tokens:', error);
+        res.status(500).json({ 
+            error: 'Failed to set tokens',
+            details: error.message 
+        });
+    }
+});
+
+// Add new route to verify authentication status
+app.get('/verify-auth', (req, res) => {
+    try {
+        if (authService.isAuthenticated()) {
+            res.status(200).json({ authenticated: true });
+        } else {
+            res.status(401).json({ authenticated: false });
+        }
+    } catch (error) {
+        logger.error('Error verifying authentication:', error);
+        res.status(500).json({ error: 'Failed to verify authentication' });
+    }
+});
+
+// THEN add your error handlers and catch-all route
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Something broke!');
 });
 
-// Add a catch-all route for undefined routes
 app.use((req, res) => {
     res.status(404).send('Sorry, that route does not exist.');
 });
@@ -374,18 +359,6 @@ app.get('/_health', (req, res) => {
         timestamp: new Date().toISOString(),
         vercel: true
     });
-});
-
-// Add this new route to handle token setting
-app.post('/set-tokens', express.json(), (req, res) => {
-    try {
-        const tokens = req.body;
-        authService.setTokens(tokens);
-        res.status(200).json({ success: true });
-    } catch (error) {
-        logger.error('Error setting tokens:', error);
-        res.status(500).json({ error: 'Failed to set tokens' });
-    }
 });
 
 module.exports = app;

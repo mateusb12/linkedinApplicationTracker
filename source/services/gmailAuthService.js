@@ -44,7 +44,7 @@ class GmailAuthService {
     constructor() {
         this.oAuth2Client = null;
         this.credentials = null;
-        this.redirectUri = process.env.OAUTH_REDIRECT_URI || 'http://localhost:8080/oauth2callback';
+        this.redirectUri = 'http://localhost:3000/oauth2callback';
         this.loadCredentials();
     }
 
@@ -79,7 +79,11 @@ class GmailAuthService {
     }
 
     isAuthenticated() {
-        return !!this.oAuth2Client?.credentials;
+        if (!this.oAuth2Client) return false;
+        
+        // Check if we have valid credentials with an access token
+        const credentials = this.oAuth2Client.credentials;
+        return !!(credentials && credentials.access_token);
     }
 
     generateAuthUrl(state) {
@@ -89,12 +93,16 @@ class GmailAuthService {
         }
 
         try {
-            return this.oAuth2Client.generateAuthUrl({
+            console.log('Generating auth URL with redirect URI:', this.redirectUri);
+            const url = this.oAuth2Client.generateAuthUrl({
                 access_type: 'offline',
                 scope: SCOPES,
                 state: state,
-                prompt: 'consent'
+                prompt: 'consent',
+                redirect_uri: this.redirectUri
             });
+            console.log('Generated URL:', url);
+            return url;
         } catch (error) {
             logger.error('Error generating auth URL:', error);
             return null;
@@ -116,6 +124,9 @@ class GmailAuthService {
         if (!this.oAuth2Client) {
             this.loadCredentials();
         }
+        if (!tokens || !tokens.access_token) {
+            throw new Error('Invalid tokens provided');
+        }
         this.oAuth2Client.setCredentials(tokens);
     }
 
@@ -123,8 +134,13 @@ class GmailAuthService {
         if (!this.oAuth2Client) {
             this.loadCredentials();
         }
-        
         return this.oAuth2Client;
+    }
+
+    clearCredentials() {
+        if (this.oAuth2Client) {
+            this.oAuth2Client.credentials = null;
+        }
     }
 }
 

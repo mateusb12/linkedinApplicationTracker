@@ -5,6 +5,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/images/email.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/images/email.png">
     <link rel="shortcut icon" href="/static/images/email.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -164,6 +165,95 @@
             align-items: center;
         }
 
+        .auth-btn, .logout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .auth-btn {
+            background-color: #0077b5;
+            color: white;
+        }
+
+        .auth-btn:hover {
+            background-color: #005f8c;
+            transform: translateY(-2px);
+        }
+
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .logout-btn:hover {
+            background-color: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .auth-status {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Add loading spinner */
+        .loading {
+            position: relative;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin: -10px 0 0 -10px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .auth-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .auth-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .auth-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .auth-message i {
+            font-size: 1.2em;
+        }
+
     </style>
 </head>
 <body>
@@ -171,12 +261,10 @@
     <section id="authentication" class="border-container">
         <h2>Gmail Authentication</h2>
         <p>Authenticate with your Gmail account to start tracking your LinkedIn job applications.</p>
-        <% if (!authenticated) { %>
-            <button id="auth-button" onclick="window.location.href='/auth/gmail'">Authenticate with Gmail</button>
-        <% } else { %>
-            <p style="color: green;">Authenticated with Gmail!</p>
-            <button onclick="logout()" style="background-color: #dc3545;">Logout</button>
-        <% } %>
+        <div id="auth-content">
+            <!-- This div will be populated by JavaScript -->
+            <div class="loading-spinner"></div>
+        </div>
     </section>
 
     <section id="fetch-emails" class="border-container">
@@ -255,40 +343,210 @@
     <p>Developed by <a href="https://mateusb12.github.io/mateus_portfolio/">Mateus</a></p>
 </footer>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const tokens = urlParams.get('tokens');
-        
-        if (tokens) {
-            localStorage.setItem('gmail_tokens', tokens);
-            window.history.replaceState({}, document.title, '/');
-        }
-
+    // Add this function to check authentication status
+    async function checkAuthStatus() {
+        console.log('Checking auth status...');
         const storedTokens = localStorage.getItem('gmail_tokens');
-        if (storedTokens) {
-            fetch('/set-tokens', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: storedTokens
-            }).then(response => {
-                if (!response.ok) {
-                    console.error('Failed to set tokens on server');
-                    localStorage.removeItem('gmail_tokens');
-                }
-            }).catch(error => {
-                console.error('Error setting tokens:', error);
-                localStorage.removeItem('gmail_tokens');
-            });
+        const authSection = document.getElementById('authentication');
+        const fetchButton = document.getElementById('fetch-button');
+        const generateChartButton = document.getElementById('generate-chart-button');
+
+        if (!storedTokens) {
+            console.log('No tokens found, showing unauthenticated state');
+            // Not authenticated state
+            authSection.innerHTML = `
+                <h2>Gmail Authentication</h2>
+                <p>Authenticate with your Gmail account to start tracking your LinkedIn job applications.</p>
+                <button id="auth-button" onclick="window.location.href='/auth/gmail'" class="auth-btn">
+                    <i class="fab fa-google"></i>
+                    Authenticate with Gmail
+                </button>
+            `;
+            
+            if (fetchButton) {
+                fetchButton.disabled = true;
+                fetchButton.style.backgroundColor = 'grey';
+                fetchButton.style.cursor = 'not-allowed';
+            }
+            if (generateChartButton) {
+                generateChartButton.disabled = true;
+                generateChartButton.style.backgroundColor = 'grey';
+                generateChartButton.style.cursor = 'not-allowed';
+            }
+            return;
         }
 
-        updateLastFetchInfo();
+        try {
+            console.log('Verifying authentication with server...');
+            const response = await fetch('/verify-auth');
+            const data = await response.json();
+
+            if (!response.ok || !data.authenticated) {
+                console.log('Authentication invalid, clearing tokens');
+                localStorage.removeItem('gmail_tokens');
+                checkAuthStatus();
+                return;
+            }
+
+            console.log('Authentication valid, updating UI');
+            // Valid authentication state
+            authSection.innerHTML = `
+                <h2>Gmail Authentication</h2>
+                <p>Authenticate with your Gmail account to start tracking your LinkedIn job applications.</p>
+                <div class="auth-status">
+                    <p style="color: green; margin-bottom: 10px;">
+                        <i class="fas fa-check-circle"></i> Successfully authenticated with Gmail
+                    </p>
+                    <button onclick="handleLogout()" class="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            `;
+            
+            if (fetchButton) {
+                fetchButton.disabled = false;
+                fetchButton.style.backgroundColor = '#0077b5';
+                fetchButton.style.cursor = 'pointer';
+            }
+            if (generateChartButton) {
+                generateChartButton.disabled = false;
+                generateChartButton.style.backgroundColor = '#0077b5';
+                generateChartButton.style.cursor = 'pointer';
+            }
+        } catch (error) {
+            console.error('Error checking auth status:', error);
+            localStorage.removeItem('gmail_tokens');
+            checkAuthStatus();
+        }
+    }
+
+    // Update the DOMContentLoaded event listener
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('Page loaded, checking authentication status...');
+        
+        try {
+            const storedTokens = localStorage.getItem('gmail_tokens');
+            console.log('Raw stored tokens:', storedTokens);
+
+            if (!storedTokens) {
+                console.log('No stored tokens found, showing login state');
+                updateAuthUI(false);
+                return;
+            }
+
+            try {
+                const tokens = JSON.parse(storedTokens);
+                console.log('Parsed tokens:', {
+                    access_token: tokens.access_token ? 'exists' : 'missing',
+                    refresh_token: tokens.refresh_token ? 'exists' : 'missing',
+                    scope: tokens.scope,
+                    token_type: tokens.token_type,
+                    expiry_date: tokens.expiry_date
+                });
+                
+                console.log('Sending tokens to server...');
+                const response = await fetch('/set-tokens', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: storedTokens  // Send the raw stored tokens string
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to set tokens');
+                }
+
+                console.log('Tokens set successfully on server');
+                updateAuthUI(true);
+                await updateLastFetchInfo();
+            } catch (error) {
+                console.error('Error during token setup:', error);
+                localStorage.removeItem('gmail_tokens');
+                updateAuthUI(false);
+            }
+        } catch (error) {
+            console.error('Error in initialization:', error);
+            updateAuthUI(false);
+        }
     });
 
-    function logout() {
-        localStorage.removeItem('gmail_tokens');
-        window.location.reload();
+    async function handleLogout() {
+        const logoutBtn = document.querySelector('.logout-btn');
+        logoutBtn.classList.add('loading');
+        
+        try {
+            const storedTokens = JSON.parse(localStorage.getItem('gmail_tokens'));
+            if (!storedTokens) {
+                throw new Error('No tokens found');
+            }
+
+            // First, revoke the token on Google's end
+            const response = await fetch('/revoke', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ tokens: storedTokens })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to revoke access');
+            }
+            
+            // Clear local storage
+            localStorage.removeItem('gmail_tokens');
+            
+            // Show feedback to user
+            const authSection = document.getElementById('authentication');
+            authSection.innerHTML = `
+                <h2>Gmail Authentication</h2>
+                <p>Authenticate with your Gmail account to start tracking your LinkedIn job applications.</p>
+                <div class="auth-message success">
+                    <i class="fas fa-check-circle"></i>
+                    Successfully logged out!
+                </div>
+                <button id="auth-button" onclick="window.location.href='/auth/gmail'" class="auth-btn">
+                    <i class="fab fa-google"></i>
+                    Authenticate with Gmail
+                </button>
+            `;
+            
+            // Disable fetch and chart buttons
+            const fetchButton = document.getElementById('fetch-button');
+            const generateChartButton = document.getElementById('generate-chart-button');
+            if (fetchButton) {
+                fetchButton.disabled = true;
+                fetchButton.style.backgroundColor = 'grey';
+                fetchButton.style.cursor = 'not-allowed';
+            }
+            if (generateChartButton) {
+                generateChartButton.disabled = true;
+                generateChartButton.style.backgroundColor = 'grey';
+                generateChartButton.style.cursor = 'not-allowed';
+            }
+
+            // Reload the page after a short delay to ensure everything is reset
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Logout error:', error);
+            const authSection = document.getElementById('authentication');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'auth-message error';
+            errorDiv.innerHTML = `
+                <i class="fas fa-exclamation-circle"></i>
+                Error during logout: ${error.message}
+            `;
+            authSection.appendChild(errorDiv);
+        } finally {
+            logoutBtn.classList.remove('loading');
+        }
     }
 
     let fetchStartTime = null;
@@ -500,6 +758,55 @@
         } finally {
             button.disabled = false;
             button.style.backgroundColor = '#0077b5';
+        }
+    }
+
+    // Add this new function to handle UI updates
+    function updateAuthUI(isAuthenticated) {
+        const authContent = document.getElementById('auth-content');
+        const fetchButton = document.getElementById('fetch-button');
+        const generateChartButton = document.getElementById('generate-chart-button');
+
+        if (isAuthenticated) {
+            authContent.innerHTML = `
+                <div class="auth-status">
+                    <p style="color: green; margin-bottom: 10px;">
+                        <i class="fas fa-check-circle"></i> Successfully authenticated with Gmail
+                    </p>
+                    <button onclick="handleLogout()" class="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            `;
+            
+            if (fetchButton) {
+                fetchButton.disabled = false;
+                fetchButton.style.backgroundColor = '#0077b5';
+                fetchButton.style.cursor = 'pointer';
+            }
+            if (generateChartButton) {
+                generateChartButton.disabled = false;
+                generateChartButton.style.backgroundColor = '#0077b5';
+                generateChartButton.style.cursor = 'pointer';
+            }
+        } else {
+            authContent.innerHTML = `
+                <button id="auth-button" onclick="window.location.href='/auth/gmail'" class="auth-btn">
+                    <i class="fab fa-google"></i>
+                    Authenticate with Gmail
+                </button>
+            `;
+            
+            if (fetchButton) {
+                fetchButton.disabled = true;
+                fetchButton.style.backgroundColor = 'grey';
+                fetchButton.style.cursor = 'not-allowed';
+            }
+            if (generateChartButton) {
+                generateChartButton.disabled = true;
+                generateChartButton.style.backgroundColor = 'grey';
+                generateChartButton.style.cursor = 'not-allowed';
+            }
         }
     }
 </script>
