@@ -318,8 +318,17 @@ app.post('/revoke', async (req, res) => {
             return res.status(400).send('No access token found.');
         }
         await authService.oAuth2Client.revokeToken(token);
-        // Delete token.json
-        await fs.unlink(path.join(__dirname, 'tokens', 'token.json'));
+        
+        if (process.env.NODE_ENV === 'production') {
+            // In production, clear the token from memory
+            authService.token = null;
+            // If using environment variable
+            // delete process.env.OAUTH_TOKEN;
+        } else {
+            // In development, delete the token file
+            await fs.unlink(path.join(__dirname, 'tokens', 'token.json'));
+        }
+        
         res.send('Access revoked successfully.');
     } catch (error) {
         logger.error('Error revoking access:', error);

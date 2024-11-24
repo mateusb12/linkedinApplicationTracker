@@ -38,11 +38,14 @@ if (process.env.NODE_ENV === 'development') {
     }
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 class GmailAuthService {
     constructor() {
         this.oAuth2Client = null;
         this.credentials = null;
         this.redirectUri = process.env.OAUTH_REDIRECT_URI || 'http://localhost:8080/oauth2callback';
+        this.token = null;
         this.loadCredentials();
     }
 
@@ -77,7 +80,25 @@ class GmailAuthService {
     }
 
     isAuthenticated() {
-        if (this.oAuth2Client && fs.existsSync(TOKEN_PATH)) {
+        if (!this.oAuth2Client) return false;
+        
+        if (isProduction) {
+            const token = this.token || process.env.OAUTH_TOKEN;
+            if (token) {
+                try {
+                    this.oAuth2Client.setCredentials(
+                        typeof token === 'string' ? JSON.parse(token) : token
+                    );
+                    return true;
+                } catch (error) {
+                    logger.error('Error parsing token:', error);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        if (fs.existsSync(TOKEN_PATH)) {
             const token = fs.readFileSync(TOKEN_PATH);
             this.oAuth2Client.setCredentials(JSON.parse(token));
             return true;
@@ -109,16 +130,18 @@ class GmailAuthService {
             const { tokens } = await this.oAuth2Client.getToken(code);
             this.oAuth2Client.setCredentials(tokens);
             
-            // Create tokens directory if it doesn't exist
-            const tokensDir = path.dirname(TOKEN_PATH);
-            if (!fs.existsSync(tokensDir)) {
-                fs.mkdirSync(tokensDir, { recursive: true });
+            if (isProduction) {
+                this.token = tokens;
+            } else {
+                const tokensDir = path.dirname(TOKEN_PATH);
+                if (!fs.existsSync(tokensDir)) {
+                    fs.mkdirSync(tokensDir, { recursive: true });
+                }
+                fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
             }
-            
-            fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
         } catch (error) {
             logger.error('Error getting and saving tokens:', error);
-            throw error; // Re-throw to handle in calling function
+            throw error;
         }
     }
 
@@ -126,10 +149,19 @@ class GmailAuthService {
         if (!this.oAuth2Client) {
             this.loadCredentials();
         }
-        if (fs.existsSync(TOKEN_PATH)) {
+        
+        if (isProduction) {
+            const token = this.token || process.env.OAUTH_TOKEN;
+            if (token) {
+                this.oAuth2Client.setCredentials(
+                    typeof token === 'string' ? JSON.parse(token) : token
+                );
+            }
+        } else if (fs.existsSync(TOKEN_PATH)) {
             const token = fs.readFileSync(TOKEN_PATH);
             this.oAuth2Client.setCredentials(JSON.parse(token));
         }
+        
         return this.oAuth2Client;
     }
 }
