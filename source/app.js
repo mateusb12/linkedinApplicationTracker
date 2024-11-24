@@ -59,6 +59,9 @@ app.use((req, res, next) => {
     if (process.env.VERCEL_URL) {
         allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
     }
+    if (process.env.PRODUCTION_URL) {
+        allowedOrigins.push(process.env.PRODUCTION_URL);
+    }
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
         res.header('Access-Control-Allow-Origin', origin);
