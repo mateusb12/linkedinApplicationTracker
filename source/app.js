@@ -32,6 +32,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Load environment variables
+require('dotenv').config();
+
+// Set REDIRECT_URI based on environment
+if (process.env.NODE_ENV !== 'production') {
+    process.env.REDIRECT_URI = 'http://localhost:3000/oauth2callback';
+}
+
 // Update the auth route to use a simpler approach
 app.get('/auth/gmail', (req, res) => {
     console.log('\n=== Starting OAuth Process ===');

@@ -3,6 +3,7 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const winston = require('winston');
+const { OAuth2Client } = require('google-auth-library');
 
 const TOKEN_PATH = path.join(__dirname, '../tokens/token.json');
 const CREDENTIALS_PATH = path.join(__dirname, '../secrets/credentials.json');
@@ -39,6 +40,14 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const isProduction = process.env.NODE_ENV === 'production';
+
+const redirectUri = process.env.REDIRECT_URI || 'http://localhost:3000/oauth2callback';
+
+const oauth2Client = new OAuth2Client(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    redirectUri
+);
 
 class GmailAuthService {
     constructor() {
