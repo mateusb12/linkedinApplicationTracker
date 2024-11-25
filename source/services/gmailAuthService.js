@@ -39,9 +39,11 @@ if (process.env.NODE_ENV === 'development') {
     }
 }
 
-const isProduction = process.env.NODE_ENV === 'production';
+// const isProduction = process.env.NODE_ENV === 'production';
+//
+// const redirectUri = process.env.REDIRECT_URI || 'http://localhost:3000/oauth2callback';
 
-const redirectUri = process.env.REDIRECT_URI || 'http://localhost:3000/oauth2callback';
+const redirectUri = process.env.REDIRECT_URI
 
 const oauth2Client = new OAuth2Client(
     process.env.GMAIL_CLIENT_ID,
