@@ -36,9 +36,9 @@ app.use(cookieParser());
 require('dotenv').config();
 
 // Set REDIRECT_URI based for localhost environment
-if (process.env.NODE_ENV !== 'production') {
-    process.env.REDIRECT_URI = 'http://localhost:3000/oauth2callback';
-}
+// if (process.env.NODE_ENV !== 'production') {
+//     process.env.REDIRECT_URI = 'http://localhost:3000/oauth2callback';
+// }
 
 // Update the auth route to use a simpler approach
 app.get('/auth/gmail', (req, res) => {

@@ -55,7 +55,7 @@ class GmailAuthService {
     constructor() {
         this.oAuth2Client = null;
         this.credentials = null;
-        this.redirectUri = 'http://localhost:3000/oauth2callback';
+        this.redirectUri = process.env.REDIRECT_URI;
         this.loadCredentials();
     }
 
