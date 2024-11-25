@@ -84,8 +84,15 @@ class GmailAuthService {
                     logger.error('No credentials found in file or environment variables');
                 }
             }
+
+            // Load tokens if they exist
+            if (fs.existsSync(TOKEN_PATH)) {
+                const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH));
+                this.oAuth2Client.setCredentials(tokens);
+                logger.info('Tokens loaded from disk:', tokens);
+            }
         } catch (error) {
-            logger.error('Error loading credentials:', error);
+            logger.error('Error loading credentials or tokens:', error);
         }
     }
 
@@ -110,7 +117,6 @@ class GmailAuthService {
                 scope: SCOPES,
                 state: state,
                 prompt: 'consent',
-                redirect_uri: this.redirectUri
             });
             console.log('Generated URL:', url);
             return url;
@@ -139,6 +145,15 @@ class GmailAuthService {
             throw new Error('Invalid tokens provided');
         }
         this.oAuth2Client.setCredentials(tokens);
+        logger.info('Tokens have been set in OAuth2Client:', tokens);
+        
+        // Save tokens to TOKEN_PATH
+        try {
+            fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
+            logger.info(`Tokens saved to ${TOKEN_PATH}`);
+        } catch (error) {
+            logger.error('Failed to save tokens to disk:', error);
+        }
     }
 
     getOAuth2Client() {
@@ -152,6 +167,10 @@ class GmailAuthService {
         if (this.oAuth2Client) {
             this.oAuth2Client.credentials = null;
         }
+    }
+
+    getCredentials() {
+        return this.oAuth2Client.credentials;
     }
 }
 

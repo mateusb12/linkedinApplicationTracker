@@ -19,8 +19,11 @@ if (Buffer.from(key).length !== 32) {
 const winston = require('winston');
 
 const logger = winston.createLogger({
-    level: 'error',
-    format: winston.format.json(),
+    level: 'debug',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+    ),
     transports: [
         new winston.transports.File({ filename: 'logs/error.log' }),
         new winston.transports.Console()
@@ -45,9 +48,29 @@ class GmailFetchService {
      */
     async* fetchEmailsGenerator(amount) {
         try {
+            logger.debug('[' + new Date().toISOString() + '] Starting fetchEmailsGenerator.');
             amount = amount || Number.MAX_SAFE_INTEGER;
 
             const auth = authService.getOAuth2Client();
+            if (!auth) {
+                logger.error('[' + new Date().toISOString() + '] OAuth2Client is not initialized.');
+                yield JSON.stringify({
+                    error: 'OAuth2Client is not initialized.'
+                });
+                return;
+            }
+
+            const credentials = auth.credentials;
+            logger.debug(`['${new Date().toISOString()}'] Current OAuth2Client credentials: ${JSON.stringify(credentials)}`);
+
+            if (!credentials || !credentials.access_token) {
+                logger.error('[' + new Date().toISOString() + '] OAuth2Client lacks valid credentials.');
+                yield JSON.stringify({
+                    error: 'OAuth2Client lacks valid credentials.'
+                });
+                return;
+            }
+
             const gmail = google.gmail({ version: 'v1', auth });
             const emailResults = [];
             let processed = 0;
@@ -55,6 +78,7 @@ class GmailFetchService {
             let nextPageToken = null;
             let totalEmails = amount;
 
+            logger.debug('[' + new Date().toISOString() + '] Listing messages from jobs-noreply@linkedin.com');
             const initialResponse = await gmail.users.messages.list({
                 userId: 'me',
                 q: 'from:jobs-noreply@linkedin.com',
@@ -63,10 +87,12 @@ class GmailFetchService {
 
             if (initialResponse.data.resultSizeEstimate !== undefined) {
                 totalEmails = Math.min(amount, initialResponse.data.resultSizeEstimate);
+                logger.debug(`['${new Date().toISOString()}'] Total emails to fetch: ${totalEmails}`);
             }
 
             do {
                 const maxResults = Math.min(500, amount - processed);
+                logger.debug(`['${new Date().toISOString()}'] Fetching ${maxResults} messages (Processed: ${processed}/${totalEmails})`);
 
                 const response = await this.fetchWithRetry(() => gmail.users.messages.list({
                     userId: 'me',
@@ -75,43 +101,61 @@ class GmailFetchService {
                     maxResults: maxResults
                 }));
 
+                if (!response || !response.data) {
+                    logger.error('[' + new Date().toISOString() + '] No data received from messages.list');
+                    yield JSON.stringify({
+                        error: 'Failed to retrieve messages.'
+                    });
+                    return;
+                }
+
                 const messages = response.data.messages || [];
                 nextPageToken = response.data.nextPageToken;
 
+                logger.debug(`['${new Date().toISOString()}'] Fetched ${messages.length} messages.`);
+
                 for (const message of messages) {
-                    const emailData = await gmail.users.messages.get({
-                        userId: 'me',
-                        id: message.id
-                    });
+                    try {
+                        const emailData = await gmail.users.messages.get({
+                            userId: 'me',
+                            id: message.id
+                        });
 
-                    const relevantData = {
-                        id: emailData.data.id,
-                        snippet: emailData.data.snippet,
-                        internalDate: emailData.data.internalDate
-                    };
-                    emailResults.push(relevantData);
+                        const relevantData = {
+                            id: emailData.data.id,
+                            snippet: emailData.data.snippet,
+                            internalDate: emailData.data.internalDate
+                        };
+                        emailResults.push(relevantData);
 
-                    processed++;
+                        processed++;
 
-                    const elapsedTime = (Date.now() - startTime) / 1000;
-                    const currentSpeed = processed / elapsedTime;
-                    const remainingEmails = totalEmails - processed;
-                    const remainingSeconds = remainingEmails / (currentSpeed || 1);
-                    const remainingTime = this.formatTime(remainingSeconds);
-                    const eta = this.calculateETA(remainingSeconds);
+                        const elapsedTime = (Date.now() - startTime) / 1000;
+                        const currentSpeed = processed / elapsedTime;
+                        const remainingEmails = totalEmails - processed;
+                        const remainingSeconds = remainingEmails / (currentSpeed || 1);
+                        const remainingTime = this.formatTime(remainingSeconds);
+                        const eta = this.calculateETA(remainingSeconds);
 
-                    yield JSON.stringify({
-                        emails_processed: processed,
-                        total_emails: totalEmails,
-                        current_speed: currentSpeed || 0,
-                        remaining_emails: remainingEmails || 0,
-                        remaining_time_formatted: remainingTime,
-                        eta_formatted: eta,
-                        message: 'Processing emails...'
-                    });
+                        logger.debug(`['${new Date().toISOString()}'] Yielding progress: Processed ${processed}/${totalEmails}`);
 
-                    if (processed >= amount) {
-                        break;
+                        yield JSON.stringify({
+                            emails_processed: processed,
+                            total_emails: totalEmails,
+                            current_speed: currentSpeed || 0,
+                            remaining_emails: remainingEmails || 0,
+                            remaining_time_formatted: remainingTime,
+                            eta_formatted: eta,
+                            message: 'Processing emails...'
+                        });
+
+                        if (processed >= amount) {
+                            logger.debug('[' + new Date().toISOString() + '] Reached the requested amount of emails to fetch.');
+                            break;
+                        }
+                    } catch (msgError) {
+                        logger.error(`['${new Date().toISOString()}'] Error fetching message ID ${message.id}: ${msgError}`);
+                        // Optionally, continue fetching other messages
                     }
                 }
 
@@ -137,11 +181,13 @@ class GmailFetchService {
             try {
                 await fs.mkdir(path.dirname(resultsPath), { recursive: true });
                 await fs.writeFile(resultsPath, JSON.stringify(encryptedData, null, 2));
+                logger.debug(`['${new Date().toISOString()}'] Successfully saved encrypted email results to ${resultsPath}`);
             } catch (fileError) {
-                logger.error('Error saving file:', fileError);
+                logger.error('[' + new Date().toISOString() + '] Error saving email results file:', fileError);
                 throw fileError;
             }
 
+            logger.debug('[' + new Date().toISOString() + '] Yielding completion message.');
             yield JSON.stringify({
                 message: 'Email fetching completed.',
                 emails_processed: processed,
@@ -149,9 +195,9 @@ class GmailFetchService {
             });
 
         } catch (error) {
-            logger.error('Error in fetchEmailsGenerator:', error);
+            logger.error('[' + new Date().toISOString() + '] Error in fetchEmailsGenerator:', error);
             yield JSON.stringify({
-                error: 'An unexpected error occurred while fetching emails. Please try again later.'
+                error: 'An unexpected error occurred while fetching emails. Please check server logs for more details.'
             });
         }
     }

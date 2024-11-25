@@ -623,7 +623,8 @@
         clearInterval(fetchUpdateInterval);
     }
 
-    function fetchEmails() {
+    async function fetchEmails() {
+        console.log(`[${new Date().toISOString()}] Initiating fetchEmails function.`);
         const fetchAmount = document.getElementById('fetch-amount').value;
         document.querySelector('.progress-data').style.display = 'block';
         const progressBar = document.getElementById('progress-bar');
@@ -657,19 +658,21 @@
         fetchButton.style.backgroundColor = 'grey';
         stopFetchButton.style.display = 'inline-block';
 
+        console.log(`[${new Date().toISOString()}] Opening EventSource for /fetch_emails.`);
         eventSource = new EventSource(`/fetch_emails?amount=${fetchAmount}`);
 
         let lastUpdate = Date.now();
         let lastProcessed = 0;
 
         eventSource.onmessage = function (e) {
+            console.log(`[${new Date().toISOString()}] Received data from EventSource: ${e.data}`);
             try {
                 const data = JSON.parse(e.data);
 
                 if (data.emails_processed !== undefined && data.total_emails !== undefined) {
                     const processed = data.emails_processed;
                     const total = data.total_emails;
-                    console.log(`Processed: ${processed}, Total: ${total}`);
+                    console.log(`[${new Date().toISOString()}] Progress Update - Processed: ${processed}, Total: ${total}`);
                     
                     const percentage = (processed / total) * 100;
                     
@@ -705,25 +708,26 @@
                 }
 
                 if (data.message === "Email fetching completed.") {
+                    console.log(`[${new Date().toISOString()}] Email fetching completed.`);
                     eventSource.close();
                     resetFetchUI();
                     alert('Emails fetched successfully!');
                 }
 
                 if (data.error) {
-                    console.error(data.error);
+                    console.error(`[${new Date().toISOString()}] Error during email fetching: ${data.error}`);
                     alert(`Error: ${data.error}`);
                     eventSource.close();
                     resetFetchUI();
                     alert('An error occurred while fetching emails.');
                 }
             } catch (error) {
-                console.error('Error parsing data:', error);
+                console.error(`[${new Date().toISOString()}] Error parsing data: ${error}`);
             }
         };
 
         eventSource.onerror = function (e) {
-            console.error('EventSource failed.', e);
+            console.error(`[${new Date().toISOString()}] EventSource failed:`, e);
             eventSource.close();
             resetFetchUI();
             alert('An error occurred while fetching emails.');

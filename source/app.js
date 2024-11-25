@@ -1,3 +1,4 @@
+// app.js
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -8,6 +9,8 @@ const winston = require('winston');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const favicon = require('serve-favicon');
+const compression = require('compression');
+const GmailFetchService = require('./services/gmailFetchService');
 
 const app = express();
 
@@ -34,11 +37,6 @@ app.use(cookieParser());
 
 // Load environment variables
 require('dotenv').config();
-
-// Set REDIRECT_URI based for localhost environment
-// if (process.env.NODE_ENV !== 'production') {
-//     process.env.REDIRECT_URI = 'http://localhost:3000/oauth2callback';
-// }
 
 // Update the auth route to use a simpler approach
 app.get('/auth/gmail', (req, res) => {
@@ -135,9 +133,14 @@ app.get('/oauth2callback', async (req, res) => {
 });
 
 // Routes
-app.get('/', (req, res) => {
-    // Don't check authentication here since it's managed client-side
-    res.render('index', { authenticated: false });
+app.get('/', async (req, res) => {
+    try {
+        const isAuthenticated = authService.isAuthenticated();
+        res.render('index', { authenticated: isAuthenticated });
+    } catch (error) {
+        logger.error('Error checking authentication status:', error);
+        res.render('index', { authenticated: false });
+    }
 });
 
 app.get('/fetch-metadata', async (req, res) => {
@@ -145,49 +148,40 @@ app.get('/fetch-metadata', async (req, res) => {
         return res.status(401).json({ error: 'Not authenticated' });
     }
 
+    res.socket.setNoDelay(true);
+
     const metadata = await fetchMetadataService.getMetadata();
     res.json(metadata);
 });
 
-app.get('/fetch_emails', async (req, res) => {
-    if (!authService.isAuthenticated()) {
-        return res.status(401).send('Not authenticated. Please authenticate with Gmail.');
-    }
 
+app.get('/fetch_emails', compression({ filter: () => false }), async (req, res) => {
+    // Set headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // Flush headers to establish SSE with client
 
-    const gmailFetchService = require('./services/gmailFetchService');
-    let emailCount = 0;
+    // Disable Nagle's algorithm
+    res.socket.setNoDelay(true);
 
-    // Extract the 'amount' parameter from the query string
-    const amountParam = req.query.amount;
-    console.log(`Requested amount: ${amountParam}`); // Log the requested amount
-
-    let amount;
-    if (amountParam === 'all') {
-        amount = null; // Set to null to indicate 'fetch all'
-    } else {
-        amount = parseInt(amountParam, 10);
-        if (isNaN(amount)) {
-            amount = 100; // Only set default if parsing fails
-        }
-    }
-
-    console.log(`Parsed amount: ${amount}`); // Log the parsed amount
+    const amount = req.query.amount ? parseInt(req.query.amount, 10) : null;
 
     try {
-        // Pass the 'amount' parameter to the fetchEmailsGenerator function
-        for await (const update of gmailFetchService.fetchEmailsGenerator(amount)) {
-            res.write(`data: ${update}\n\n`);
+        const emailGenerator = GmailFetchService.fetchEmailsGenerator(amount);
+
+        for await (const chunk of emailGenerator) {
+            // Send each chunk as an SSE event
+            res.write(`data: ${chunk}\n\n`);
+            res.flush(); // Flush after each write
         }
-        // Update metadata after successful fetch
-        await fetchMetadataService.updateMetadata(emailCount);
+
+        // Send a final comment to indicate the end of the stream
+        res.write(`: Completed\n\n`);
+        res.end();
     } catch (error) {
-        logger.error('Error fetching emails:', error);
-        res.write(`data: ${JSON.stringify({ error: 'An error occurred while fetching emails. Please try again later.' })}\n\n`);
-    } finally {
+        console.error('Error in /fetch_emails endpoint:', error);
+        res.write(`data: ${JSON.stringify({ error: 'An error occurred while fetching emails.' })}\n\n`);
         res.end();
     }
 });
