@@ -12,9 +12,39 @@ const app = express();
 
 // Basic middleware setup
 app.set('views', path.join(__dirname, 'views'));
-app.use('/static', express.static(path.join(__dirname, 'public')));
-app.set('view engine', 'ejs');
 
+// 1. First log the request
+app.use('/static', (req, res, next) => {
+    console.log('Static file requested:', req.url);
+    console.log('Looking in:', path.join(__dirname, 'static', req.url));
+    next();
+});
+
+// 2. Then try to serve the static file
+app.use('/static', express.static(path.join(__dirname, 'static')));
+
+// 3. If the file wasn't found, this middleware will handle it
+app.get('/static/*', (req, res) => {
+    console.log('404 for static file:', req.url);
+    console.log('Directories that exist:');
+    try {
+        const staticPath = path.join(__dirname, 'static');
+        const imagesPath = path.join(__dirname, 'static', 'images');
+        const requestedPath = path.join(__dirname, 'static', req.url.replace('/static/', ''));
+        
+        console.log('static directory exists:', fs.existsSync(staticPath));
+        console.log('static path:', staticPath);
+        console.log('static/images directory exists:', fs.existsSync(imagesPath));
+        console.log('images path:', imagesPath);
+        console.log('Requested file exists:', fs.existsSync(requestedPath));
+        console.log('requested path:', requestedPath);
+    } catch (err) {
+        console.error('Error checking directories:', err);
+    }
+    res.status(404).send('File not found');
+});
+
+app.set('view engine', 'ejs');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -326,7 +356,48 @@ app.get('/verify-auth', (req, res) => {
     }
 });
 
-// THEN add your error handlers and catch-all route
+// Move this BEFORE any catch-all routes and error handlers
+app.get('/favicon-image', (req, res) => {
+    const imagePath = path.join(__dirname, 'static', 'images', 'email.png');
+    
+    console.log('Serving favicon image');
+    console.log('Full image path:', imagePath);
+    
+    // Check if file exists
+    fs.access(imagePath, fs.constants.F_OK, (err) => {
+        if (err) {
+            console.error('File does not exist:', err);
+            return res.status(404).send('Image not found');
+        }
+        
+        // Try to read and send the file
+        try {
+            // Set the correct content type
+            res.setHeader('Content-Type', 'image/png');
+            
+            // Create a read stream and pipe it to the response
+            const stream = fs.createReadStream(imagePath);
+            stream.pipe(res);
+            
+            stream.on('error', (streamErr) => {
+                console.error('Stream error:', streamErr);
+                res.status(500).send('Error streaming file');
+            });
+            
+        } catch (error) {
+            console.error('Error serving image:', error);
+            res.status(500).send('Error serving image');
+        }
+    });
+});
+
+// Add this with your other routes, before error handlers
+app.get('/favicon.ico', (req, res) => {
+    const faviconPath = path.join(__dirname, 'static', 'images', 'email.png');
+    res.sendFile(faviconPath);
+});
+
+// AFTER the test-image route, THEN add your error handlers and catch-all route
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Something broke!');
