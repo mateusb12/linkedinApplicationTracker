@@ -39,139 +39,59 @@ if (process.env.NODE_ENV === 'development') {
     }
 }
 
-// const isProduction = process.env.NODE_ENV === 'production';
-//
-// const redirectUri = process.env.REDIRECT_URI || 'http://localhost:3000/oauth2callback';
+// Load environment variables if not already loaded
+require('dotenv').config();
 
-const redirectUri = process.env.REDIRECT_URI
+// Define REDIRECT_URI from environment variables
+const redirectUri = process.env.REDIRECT_URI;
+if (!redirectUri) {
+    throw new Error('REDIRECT_URI is not defined in environment variables');
+}
 
-const oauth2Client = new OAuth2Client(
-    process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET,
+// Initialize OAuth2 client with redirectUri
+const oauth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
     redirectUri
 );
 
-class GmailAuthService {
-    constructor() {
-        this.oAuth2Client = null;
-        this.credentials = null;
-        this.redirectUri = process.env.REDIRECT_URI;
-        this.loadCredentials();
-    }
-
-    loadCredentials() {
-        try {
-            if (fs.existsSync(CREDENTIALS_PATH)) {
-                const content = fs.readFileSync(CREDENTIALS_PATH);
-                this.credentials = JSON.parse(content);
-                
-                const { client_secret, client_id } = this.credentials.installed || this.credentials.web;
-                
-                this.oAuth2Client = new google.auth.OAuth2(
-                    client_id, client_secret, this.redirectUri
-                );
-            } else {
-                // Attempt to load credentials from environment variables
-                const client_id = process.env.CLIENT_ID;
-                const client_secret = process.env.CLIENT_SECRET;
-
-                if (client_id && client_secret) {
-                    logger.info('Using credentials from environment variables');
-                    this.oAuth2Client = new google.auth.OAuth2(
-                        client_id, client_secret, this.redirectUri
-                    );
-                } else {
-                    logger.error('No credentials found in file or environment variables');
-                }
-            }
-
-            // Load tokens if they exist
-            if (fs.existsSync(TOKEN_PATH)) {
-                const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH));
-                this.oAuth2Client.setCredentials(tokens);
-                logger.info('Tokens loaded from disk:', tokens);
-            }
-        } catch (error) {
-            logger.error('Error loading credentials or tokens:', error);
-        }
-    }
-
-    isAuthenticated() {
-        if (!this.oAuth2Client) return false;
-        
-        // Check if we have valid credentials with an access token
-        const credentials = this.oAuth2Client.credentials;
-        return !!(credentials && credentials.access_token);
-    }
-
-    generateAuthUrl(state) {
-        if (!this.oAuth2Client) {
-            logger.error('OAuth2Client is not initialized');
-            return null;
-        }
-
-        try {
-            console.log('Generating auth URL with redirect URI:', this.redirectUri);
-            const url = this.oAuth2Client.generateAuthUrl({
-                access_type: 'offline',
-                scope: SCOPES,
-                state: state,
-                prompt: 'consent',
-            });
-            console.log('Generated URL:', url);
-            return url;
-        } catch (error) {
-            logger.error('Error generating auth URL:', error);
-            return null;
-        }
-    }
-
-    async getTokens(code) {
-        try {
-            const { tokens } = await this.oAuth2Client.getToken(code);
-            this.oAuth2Client.setCredentials(tokens);
-            return tokens;
-        } catch (error) {
-            logger.error('Error getting tokens:', error);
-            throw error;
-        }
-    }
-
-    setTokens(tokens) {
-        if (!this.oAuth2Client) {
-            this.loadCredentials();
-        }
-        if (!tokens || !tokens.access_token) {
-            throw new Error('Invalid tokens provided');
-        }
-        this.oAuth2Client.setCredentials(tokens);
-        logger.info('Tokens have been set in OAuth2Client:', tokens);
-        
-        // Save tokens to TOKEN_PATH
-        try {
-            fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
-            logger.info(`Tokens saved to ${TOKEN_PATH}`);
-        } catch (error) {
-            logger.error('Failed to save tokens to disk:', error);
-        }
-    }
-
-    getOAuth2Client() {
-        if (!this.oAuth2Client) {
-            this.loadCredentials();
-        }
-        return this.oAuth2Client;
-    }
-
-    clearCredentials() {
-        if (this.oAuth2Client) {
-            this.oAuth2Client.credentials = null;
-        }
-    }
-
-    getCredentials() {
-        return this.oAuth2Client.credentials;
-    }
+// Function to generate Auth URL
+function generateAuthUrl(state) {
+    return oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+        state: state,
+    });
 }
 
-module.exports = new GmailAuthService();
+// Function to get tokens
+async function getTokens(code) {
+    const { tokens } = await oauth2Client.getToken(code);
+    return tokens;
+}
+
+// Function to set tokens
+function setTokens(tokens) {
+    oauth2Client.setCredentials(tokens);
+}
+
+// Function to check authentication status
+function isAuthenticated() {
+    const credentials = oauth2Client.credentials;
+    return credentials && credentials.access_token;
+}
+
+// Function to get OAuth2 client
+function getOAuth2Client() {
+    return oauth2Client;
+}
+
+// Export necessary functions and redirectUri
+module.exports = {
+    generateAuthUrl,
+    getTokens,
+    setTokens,
+    isAuthenticated,
+    getOAuth2Client,
+    redirectUri, // Exporting redirectUri for logging purposes
+};
