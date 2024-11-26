@@ -1,7 +1,9 @@
 // routes/tokenRoutes.js
 const express = require('express');
 const authService = require("../services/gmailAuthService");
-const { clearCredentials } = require('../services/authService');
+const { clearCredentials } = require("../services/gmailAuthService");
+const gmailFetchService = require('../services/gmailFetchService');
+const logger = require('../services/logger');
 
 const router = express.Router();
 
@@ -73,7 +75,7 @@ router.post('/revoke', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error in revoke endpoint:', error);
+        logger.error('Error in revoke endpoint:', error);
         res.status(500).json({
             error: 'Failed to revoke access',
             details: error.message
@@ -92,6 +94,29 @@ router.get('/verify-auth', (req, res) => {
     } catch (error) {
         logger.error('Error verifying authentication:', error);
         res.status(500).json({ error: 'Failed to verify authentication' });
+    }
+});
+
+router.post('/stop_fetch', express.json(), (req, res) => {
+    const { taskId } = req.body;
+
+    if (!taskId) {
+        return res.status(400).json({
+            error: 'Task ID is required to stop fetching.'
+        });
+    }
+
+    const success = gmailFetchService.stopFetching(taskId);
+
+    if (success) {
+        res.status(200).json({
+            success: true,
+            message: 'Fetch aborted successfully.'
+        });
+    } else {
+        res.status(400).json({
+            error: 'Invalid Task ID or no active fetch found for the provided Task ID.'
+        });
     }
 });
 

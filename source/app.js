@@ -60,15 +60,6 @@ app.get('/', async (req, res) => {
 
 
 // Route to delete stored email data
-app.delete('/delete-data', async (req, res) => {
-    try {
-        await fs.unlink(path.join(__dirname, 'data', 'email_results.json'));
-        res.send('Data deleted successfully.');
-    } catch (error) {
-        logger.error('Error deleting data:', error);
-        res.status(500).send('Failed to delete data.');
-    }
-});
 
 
 

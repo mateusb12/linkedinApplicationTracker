@@ -352,6 +352,8 @@
     <p>Developed by <a href="https://mateusb12.github.io/mateus_portfolio/">Mateus</a></p>
 </footer>
 <script>
+    let currentTaskId = null;
+
     // Add this function to check authentication status
     async function checkAuthStatus() {
         console.log('Checking auth status...');
@@ -605,27 +607,23 @@
         }
     }
 
-    function stopFetch() {
-        if (eventSource) {
-            eventSource.close();
-            resetFetchUI();
-            alert('Email fetching stopped by user.');
-        }
-    }
-
     function resetFetchUI() {
+        const progressBar = document.getElementById('progress-bar');
         const fetchButton = document.getElementById('fetch-button');
         const stopFetchButton = document.getElementById('stop-fetch-button');
-        
+
         fetchButton.disabled = false;
         fetchButton.style.backgroundColor = '#0077b5';
         stopFetchButton.style.display = 'none';
-        clearInterval(fetchUpdateInterval);
+
+        if (fetchUpdateInterval) {
+            clearInterval(fetchUpdateInterval);
+        }
     }
 
     async function fetchEmails() {
-        console.log(`[${new Date().toISOString()}] Initiating fetchEmails function.`);
         const fetchAmount = document.getElementById('fetch-amount').value;
+
         document.querySelector('.progress-data').style.display = 'block';
         const progressBar = document.getElementById('progress-bar');
         const fetchButton = document.getElementById('fetch-button');
@@ -658,80 +656,115 @@
         fetchButton.style.backgroundColor = 'grey';
         stopFetchButton.style.display = 'inline-block';
 
-        console.log(`[${new Date().toISOString()}] Opening EventSource for /fetch_emails.`);
-        eventSource = new EventSource(`/fetch_emails?amount=${fetchAmount}`);
+        try {
+            // Send POST request to start fetching
+            const response = await fetch('/fetch_emails', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ amount: fetchAmount }),
+            });
 
-        let lastUpdate = Date.now();
-        let lastProcessed = 0;
+            if (!response.ok) {
+                throw new Error('Failed to start fetching emails.');
+            }
 
-        eventSource.onmessage = function (e) {
-            console.log(`[${new Date().toISOString()}] Received data from EventSource: ${e.data}`);
-            try {
-                const data = JSON.parse(e.data);
+            const data = await response.json();
+            const taskId = data.taskId;
+            currentTaskId = taskId; // Store current task ID
+            console.log(`[${new Date().toISOString()}] Received Task ID: ${taskId}`);
 
-                if (data.emails_processed !== undefined && data.total_emails !== undefined) {
-                    const processed = data.emails_processed;
-                    const total = data.total_emails;
-                    console.log(`[${new Date().toISOString()}] Progress Update - Processed: ${processed}, Total: ${total}`);
-                    
-                    const percentage = (processed / total) * 100;
-                    
-                    // Update progress bar and counts
-                    progressBar.value = percentage;
+            // Start polling for progress every second
+            const progressInterval = setInterval(async () => {
+                try {
+                    const progressResponse = await fetch(`/fetch_progress/${taskId}`);
+                    if (!progressResponse.ok) {
+                        throw new Error('Failed to fetch progress.');
+                    }
+
+                    const progressData = await progressResponse.json();
+
+                    if (progressData.error) {
+                        throw new Error(progressData.error);
+                    }
+
+                    // Update progress bar and display
+                    const processed = progressData.processed || progressData.emails_processed || 0;
+                    const total = progressData.total || progressData.total_emails || 0;
+                    const percentage = total > 0 ? (processed / total) * 100 : 0;
+
                     emailsProcessed.textContent = processed;
                     totalEmails.textContent = total;
-                    
-                    // Calculate speed
-                    const now = Date.now();
-                    const timeDiff = (now - lastUpdate) / 1000; // Convert to seconds
-                    const emailsDiff = processed - lastProcessed;
-                    if (timeDiff > 0) {
-                        const speed = emailsDiff / timeDiff;
-                        currentSpeed.textContent = speed.toFixed(2);
-                        
-                        // Calculate remaining emails and ETA
-                        const remaining = total - processed;
-                        remainingEmails.textContent = remaining;
-                        
-                        if (speed > 0) {
-                            const etaSeconds = remaining / speed;
-                            const etaTimestamp = formatCurrentTimePlusSeconds(etaSeconds);
-                            eta.textContent = etaTimestamp;
-                        }
+                    progressBar.value = percentage.toFixed(2);
+
+                    currentSpeed.textContent = progressData.current_speed ? progressData.current_speed.toFixed(2) : '0';
+                    remainingEmails.textContent = progressData.remaining_emails || 0;
+                    eta.textContent = progressData.eta_formatted || 'Calculating...';
+
+                    // Handle completed status
+                    if (progressData.status === 'completed') {
+                        clearInterval(progressInterval);
+                        resetFetchUI();
+                        alert('Emails fetched successfully!');
                     }
-                    
-                    lastUpdate = now;
-                    lastProcessed = processed;
 
-                    // Update metadata display
-                    updateLastFetchInfo();
-                }
+                    // Handle aborted status
+                    if (progressData.status === 'aborted') {
+                        clearInterval(progressInterval);
+                        resetFetchUI();
+                        alert('Email fetching has been aborted.');
+                    }
 
-                if (data.message === "Email fetching completed.") {
-                    console.log(`[${new Date().toISOString()}] Email fetching completed.`);
-                    eventSource.close();
-                    resetFetchUI();
-                    alert('Emails fetched successfully!');
-                }
+                    // Handle error status
+                    if (progressData.status === 'error') {
+                        clearInterval(progressInterval);
+                        resetFetchUI();
+                        alert(`Error: ${progressData.error}`);
+                    }
 
-                if (data.error) {
-                    console.error(`[${new Date().toISOString()}] Error during email fetching: ${data.error}`);
-                    alert(`Error: ${data.error}`);
-                    eventSource.close();
+                } catch (error) {
+                    console.error('Error fetching progress:', error);
+                    clearInterval(progressInterval);
                     resetFetchUI();
                     alert('An error occurred while fetching emails.');
                 }
-            } catch (error) {
-                console.error(`[${new Date().toISOString()}] Error parsing data: ${error}`);
-            }
-        };
+            }, 1000); // Poll every 1 second
 
-        eventSource.onerror = function (e) {
-            console.error(`[${new Date().toISOString()}] EventSource failed:`, e);
-            eventSource.close();
+        } catch (error) {
+            console.error('Fetch Emails Error:', error);
             resetFetchUI();
-            alert('An error occurred while fetching emails.');
-        };
+            alert('An error occurred while initiating email fetching.');
+        }
+    }
+
+    async function stopFetch() {
+        if (!currentTaskId) {
+            alert('No active fetch task to stop.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/stop_fetch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ taskId: currentTaskId }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert(data.message);
+                // The polling will handle UI reset upon receiving 'aborted' status
+            } else {
+                throw new Error(data.error || 'Failed to stop fetch.');
+            }
+        } catch (error) {
+            console.error('Stop Fetch Error:', error);
+            alert(`Error: ${error.message}`);
+        }
     }
 
     function formatCurrentTimePlusSeconds(seconds) {

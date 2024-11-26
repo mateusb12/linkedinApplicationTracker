@@ -86,6 +86,20 @@ function getOAuth2Client() {
     return oauth2Client;
 }
 
+// Add this function to clear credentials
+async function clearCredentials() {
+    try {
+        // Remove stored token file if it exists
+        await fs.unlink(TOKEN_PATH);
+        // Reset OAuth2 client credentials
+        oauth2Client.setCredentials({});
+        logger.info('Credentials cleared successfully.');
+    } catch (error) {
+        logger.error('Error clearing credentials:', error);
+        throw error;
+    }
+}
+
 // Export necessary functions and redirectUri
 module.exports = {
     generateAuthUrl,
@@ -93,5 +107,6 @@ module.exports = {
     setTokens,
     isAuthenticated,
     getOAuth2Client,
-    redirectUri, // Exporting redirectUri for logging purposes
+    clearCredentials,
+    redirectUri,
 };

@@ -4,6 +4,9 @@ const authService = require("../services/gmailAuthService");
 const fetchMetadataService = require("../services/fetchMetadataService");
 const compression = require("compression");
 const GmailFetchService = require("../services/gmailFetchService");
+const fs = require("fs");
+const path = require("path");
+const logger = require('../services/logger');
 
 const router = express.Router();
 
@@ -20,34 +23,78 @@ router.get('/fetch-metadata', async (req, res) => {
 });
 
 
-router.get('/fetch_emails', compression({ filter: () => false }), async (req, res) => {
-    // Set headers for SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders(); // Flush headers to establish SSE with client
+router.post('/fetch_emails', async (req, res) => {
+    const { amount } = req.body; // Expecting JSON body with 'amount'
 
-    // Disable Nagle's algorithm
-    res.socket.setNoDelay(true);
-
-    const amount = req.query.amount ? parseInt(req.query.amount, 10) : null;
+    if (!authService.isAuthenticated()) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
 
     try {
-        const emailGenerator = GmailFetchService.fetchEmailsGenerator(amount);
-
-        for await (const chunk of emailGenerator) {
-            // Send each chunk as an SSE event
-            res.write(`data: ${chunk}\n\n`);
-            res.flush(); // Flush after each write
-        }
-
-        // Send a final comment to indicate the end of the stream
-        res.write(`: Completed\n\n`);
-        res.end();
+        const taskId = GmailFetchService.startFetching(amount);
+        res.json({ taskId });
     } catch (error) {
-        console.error('Error in /fetch_emails endpoint:', error);
-        res.write(`data: ${JSON.stringify({ error: 'An error occurred while fetching emails.' })}\n\n`);
-        res.end();
+        logger.error('Error starting email fetch:', error);
+        res.status(500).json({ error: 'Failed to start email fetching.' });
+    }
+});
+
+router.get('/fetch_progress/:taskId', async (req, res) => {
+    const { taskId } = req.params;
+
+    const progress = GmailFetchService.getProgress(taskId);
+
+    if (!progress) {
+        return res.status(404).json({ error: 'Task ID not found.' });
+    }
+
+    res.status(200).json({
+        processed: progress.processed,
+        total: progress.total,
+        current_speed: progress.current_speed,
+        remaining_emails: progress.remaining_emails,
+        eta_formatted: progress.eta_formatted,
+        status: progress.status,
+        error: progress.error
+    });
+});
+
+router.delete('/delete-data', async (req, res) => {
+    try {
+        await fs.unlink(path.join(__dirname, 'data', 'email_results.json'));
+        res.send('Data deleted successfully.');
+    } catch (error) {
+        logger.error('Error deleting data:', error);
+        res.status(500).send('Failed to delete data.');
+    }
+});
+
+router.post('/stop_fetch', express.json(), async (req, res) => {
+    const { taskId } = req.body;
+
+    if (!authService.isAuthenticated()) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    if (!taskId) {
+        return res.status(400).json({ error: 'Task ID is required.' });
+    }
+
+    try {
+        const success = GmailFetchService.stopFetching(taskId);
+        if (success) {
+            res.status(200).json({
+                success: true,
+                message: 'Fetch aborted successfully.'
+            });
+        } else {
+            res.status(400).json({
+                error: 'Invalid Task ID or no active fetch found for the provided Task ID.'
+            });
+        }
+    } catch (error) {
+        logger.error('Error stopping email fetch:', error);
+        res.status(500).json({ error: 'Failed to stop email fetching.' });
     }
 });
 
