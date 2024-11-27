@@ -3,6 +3,7 @@
 <head>
     <title>Gmail Analyzer</title>
 <!--    <link rel="icon" type="image/png" href="/favicon-image">-->
+    <script src="/scripts/utils.js"></script>
     <link rel="icon" type="image/png" href="/images/email.png">
     <link rel="shortcut icon" href="/images/email.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -353,6 +354,8 @@
 </footer>
 <script>
     let currentTaskId = null;
+    let eventSource = null;
+
 
     // Add this function to check authentication status
     async function checkAuthStatus() {
@@ -560,21 +563,21 @@
         }
     }
 
-    let fetchStartTime = null;
-    let fetchUpdateInterval = null;
-    let eventSource = null;
+    // let fetchStartTime = null;
+    // let fetchUpdateInterval = null;
+    // let eventSource = null;
 
-    function updateElapsedTime() {
-        if (!fetchStartTime) return;
-
-        const now = new Date();
-        const elapsed = Math.floor((now - fetchStartTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-
-        document.getElementById('fetch-elapsed-time').textContent =
-            `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
+    // function updateElapsedTime() {
+    //     if (!fetchStartTime) return;
+    //
+    //     const now = new Date();
+    //     const elapsed = Math.floor((now - fetchStartTime) / 1000);
+    //     const minutes = Math.floor(elapsed / 60);
+    //     const seconds = elapsed % 60;
+    //
+    //     document.getElementById('fetch-elapsed-time').textContent =
+    //         `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    // }
 
     async function updateLastFetchInfo() {
         try {
@@ -607,133 +610,158 @@
         }
     }
 
-    function resetFetchUI() {
-        const progressBar = document.getElementById('progress-bar');
-        const fetchButton = document.getElementById('fetch-button');
-        const stopFetchButton = document.getElementById('stop-fetch-button');
+    // function resetFetchUI() {
+    //     const progressBar = document.getElementById('progress-bar');
+    //     const fetchButton = document.getElementById('fetch-button');
+    //     const stopFetchButton = document.getElementById('stop-fetch-button');
+    //
+    //     fetchButton.disabled = false;
+    //     fetchButton.style.backgroundColor = '#0077b5';
+    //     stopFetchButton.style.display = 'none';
+    //
+    //     if (fetchUpdateInterval) {
+    //         clearInterval(fetchUpdateInterval);
+    //     }
+    // }
 
-        fetchButton.disabled = false;
-        fetchButton.style.backgroundColor = '#0077b5';
-        stopFetchButton.style.display = 'none';
-
-        if (fetchUpdateInterval) {
-            clearInterval(fetchUpdateInterval);
-        }
-    }
+    // function getDOMElements() {
+    //     return {
+    //         fetchAmountInput: document.getElementById('fetch-amount'),
+    //         progressData: document.querySelector('.progress-data'),
+    //         progressBar: document.getElementById('progress-bar'),
+    //         emailsProcessed: document.getElementById('emails-processed'),
+    //         totalEmails: document.getElementById('total-emails'),
+    //         currentSpeed: document.getElementById('current-speed'),
+    //         remainingEmails: document.getElementById('remaining-emails'),
+    //         eta: document.getElementById('eta'),
+    //         fetchButton: document.getElementById('fetch-button'),
+    //         stopFetchButton: document.getElementById('stop-fetch-button'),
+    //         fetchStartTimeDisplay: document.getElementById('fetch-start-time')
+    //     };
+    // }
+    //
+    // function initializeProgressUI(elements) {
+    //     elements.progressData.style.display = 'block';
+    //     elements.progressBar.value = 0;
+    //     elements.emailsProcessed.textContent = '0';
+    //     elements.totalEmails.textContent = '0';
+    //     elements.currentSpeed.textContent = '0';
+    //     elements.remainingEmails.textContent = '0';
+    //     elements.eta.textContent = 'Calculating...';
+    //     elements.progressBar.style.display = 'block';
+    //     elements.fetchButton.disabled = true;
+    //     elements.fetchButton.style.backgroundColor = 'grey';
+    //     elements.stopFetchButton.style.display = 'inline-block';
+    // }
+    //
+    // function startMetadataTracking(elements) {
+    //     fetchStartTime = new Date();
+    //     elements.fetchStartTimeDisplay.textContent = fetchStartTime.toLocaleTimeString('en-GB', { hour12: false });
+    //
+    //     if (fetchUpdateInterval) {
+    //         clearInterval(fetchUpdateInterval);
+    //     }
+    //     fetchUpdateInterval = setInterval(updateElapsedTime, 1000); // Assumes updateElapsedTime is defined elsewhere
+    // }
+    //
+    // async function startEmailFetch(amount) {
+    //     const response = await fetch('/fetch_emails', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({ amount }),
+    //     });
+    //
+    //     if (!response.ok) {
+    //         throw new Error('Failed to start fetching emails.');
+    //     }
+    //
+    //     const data = await response.json();
+    //     return data.taskId;
+    // }
+    //
+    // function pollFetchProgress(taskId, elements) {
+    //     const progressInterval = setInterval(async () => {
+    //         try {
+    //             const progressResponse = await fetch(`/fetch_progress/${taskId}`);
+    //             if (!progressResponse.ok) {
+    //                 throw new Error('Failed to fetch progress.');
+    //             }
+    //
+    //             const progressData = await progressResponse.json();
+    //
+    //             if (progressData.error) {
+    //                 throw new Error(progressData.error);
+    //             }
+    //
+    //             updateProgressUI(progressData, elements);
+    //
+    //             handleFetchStatus(progressData, progressInterval, elements);
+    //         } catch (error) {
+    //             console.error('Error fetching progress:', error);
+    //             clearInterval(progressInterval);
+    //             resetFetchUI(elements);
+    //             alert('An error occurred while fetching emails.');
+    //         }
+    //     }, 1000); // Poll every 1 second
+    // }
+    //
+    // function handleFetchStatus(progressData, progressInterval, elements) {
+    //     const status = progressData.status;
+    //
+    //     if (status === 'completed') {
+    //         clearInterval(progressInterval);
+    //         resetFetchUI(elements);
+    //         alert('Emails fetched successfully!');
+    //     } else if (status === 'aborted') {
+    //         clearInterval(progressInterval);
+    //         resetFetchUI(elements);
+    //         alert('Email fetching has been aborted.');
+    //     } else if (status === 'error') {
+    //         clearInterval(progressInterval);
+    //         resetFetchUI(elements);
+    //         alert(`Error: ${progressData.error}`);
+    //     }
+    // }
+    //
+    //
+    // function updateProgressUI(progressData, elements) {
+    //     const processed = progressData.processed || progressData.emails_processed || 0;
+    //     const total = progressData.total || progressData.total_emails || 0;
+    //     const percentage = total > 0 ? (processed / total) * 100 : 0;
+    //
+    //     elements.emailsProcessed.textContent = processed;
+    //     elements.totalEmails.textContent = total;
+    //     elements.progressBar.value = percentage.toFixed(2);
+    //
+    //     elements.currentSpeed.textContent = progressData.current_speed
+    //         ? progressData.current_speed.toFixed(2)
+    //         : '0';
+    //     elements.remainingEmails.textContent = progressData.remaining_emails || 0;
+    //     elements.eta.textContent = progressData.eta_formatted || 'Calculating...';
+    // }
 
     async function fetchEmails() {
-        const fetchAmount = document.getElementById('fetch-amount').value;
+        const elements = getDOMElements();
+        const fetchAmount = parseInt(elements.fetchAmountInput.value, 10);
 
-        document.querySelector('.progress-data').style.display = 'block';
-        const progressBar = document.getElementById('progress-bar');
-        const fetchButton = document.getElementById('fetch-button');
-        const stopFetchButton = document.getElementById('stop-fetch-button');
-        const emailsProcessed = document.getElementById('emails-processed');
-        const totalEmails = document.getElementById('total-emails');
-        const currentSpeed = document.getElementById('current-speed');
-        const remainingEmails = document.getElementById('remaining-emails');
-        const eta = document.getElementById('eta');
-
-        // Reset and show progress elements
-        progressBar.value = 0;
-        emailsProcessed.textContent = '0';
-        totalEmails.textContent = '0';
-        currentSpeed.textContent = '0';
-        remainingEmails.textContent = '0';
-        eta.textContent = 'Calculating...';
-
-        // Reset and start metadata tracking
-        fetchStartTime = new Date();
-        document.getElementById('fetch-start-time').textContent = fetchStartTime.toLocaleTimeString('en-GB', { hour12: false });
-
-        if (fetchUpdateInterval) {
-            clearInterval(fetchUpdateInterval);
+        if (isNaN(fetchAmount) || fetchAmount <= 0) {
+            alert('Please enter a valid number of emails to fetch.');
+            return;
         }
-        fetchUpdateInterval = setInterval(updateElapsedTime, 1000);
 
-        progressBar.style.display = 'block';
-        fetchButton.disabled = true;
-        fetchButton.style.backgroundColor = 'grey';
-        stopFetchButton.style.display = 'inline-block';
+        initializeProgressUI(elements);
+        startMetadataTracking(elements);
 
         try {
-            // Send POST request to start fetching
-            const response = await fetch('/fetch_emails', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ amount: fetchAmount }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to start fetching emails.');
-            }
-
-            const data = await response.json();
-            const taskId = data.taskId;
+            const taskId = await startEmailFetch(fetchAmount);
             currentTaskId = taskId; // Store current task ID
             console.log(`[${new Date().toISOString()}] Received Task ID: ${taskId}`);
-
-            // Start polling for progress every second
-            const progressInterval = setInterval(async () => {
-                try {
-                    const progressResponse = await fetch(`/fetch_progress/${taskId}`);
-                    if (!progressResponse.ok) {
-                        throw new Error('Failed to fetch progress.');
-                    }
-
-                    const progressData = await progressResponse.json();
-
-                    if (progressData.error) {
-                        throw new Error(progressData.error);
-                    }
-
-                    // Update progress bar and display
-                    const processed = progressData.processed || progressData.emails_processed || 0;
-                    const total = progressData.total || progressData.total_emails || 0;
-                    const percentage = total > 0 ? (processed / total) * 100 : 0;
-
-                    emailsProcessed.textContent = processed;
-                    totalEmails.textContent = total;
-                    progressBar.value = percentage.toFixed(2);
-
-                    currentSpeed.textContent = progressData.current_speed ? progressData.current_speed.toFixed(2) : '0';
-                    remainingEmails.textContent = progressData.remaining_emails || 0;
-                    eta.textContent = progressData.eta_formatted || 'Calculating...';
-
-                    // Handle completed status
-                    if (progressData.status === 'completed') {
-                        clearInterval(progressInterval);
-                        resetFetchUI();
-                        alert('Emails fetched successfully!');
-                    }
-
-                    // Handle aborted status
-                    if (progressData.status === 'aborted') {
-                        clearInterval(progressInterval);
-                        resetFetchUI();
-                        alert('Email fetching has been aborted.');
-                    }
-
-                    // Handle error status
-                    if (progressData.status === 'error') {
-                        clearInterval(progressInterval);
-                        resetFetchUI();
-                        alert(`Error: ${progressData.error}`);
-                    }
-
-                } catch (error) {
-                    console.error('Error fetching progress:', error);
-                    clearInterval(progressInterval);
-                    resetFetchUI();
-                    alert('An error occurred while fetching emails.');
-                }
-            }, 1000); // Poll every 1 second
-
+            pollFetchProgress(taskId, elements);
         } catch (error) {
             console.error('Fetch Emails Error:', error);
-            resetFetchUI();
+            resetFetchUI(elements);
             alert('An error occurred while initiating email fetching.');
         }
     }
@@ -767,11 +795,11 @@
         }
     }
 
-    function formatCurrentTimePlusSeconds(seconds) {
-        const now = new Date();
-        const etaDate = new Date(now.getTime() + (seconds * 1000));
-        return etaDate.toLocaleTimeString('en-GB', { hour12: false });
-    }
+    // function formatCurrentTimePlusSeconds(seconds) {
+    //     const now = new Date();
+    //     const etaDate = new Date(now.getTime() + (seconds * 1000));
+    //     return etaDate.toLocaleTimeString('en-GB', { hour12: false });
+    // }
 
     async function generateApplicationChart() {
         const button = document.getElementById('generate-chart-button');

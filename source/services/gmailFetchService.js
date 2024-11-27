@@ -1,3 +1,4 @@
+// gmailFetchService.js
 const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -54,10 +55,13 @@ class GmailFetchService {
         this.taskStatus[taskId] = 'in_progress'; // Initialize status
         this.progressStore[taskId] = {
             processed: 0,
-            total: 0,
+            total: amount || Number.MAX_SAFE_INTEGER,
             emails: [],
             status: 'in_progress',
-            error: null
+            error: null,
+            current_speed: 0,
+            remaining_emails: amount || Number.MAX_SAFE_INTEGER,
+            eta_formatted: 'Calculating...'
         };
 
         this.fetchEmails(taskId, amount);
@@ -116,6 +120,9 @@ class GmailFetchService {
 
             const abortController = new AbortController();
             this.abortControllers[taskId] = abortController;
+
+            // After initializing progressStore
+            logger.debug(`[${new Date().toISOString()}] Initialized progressStore for Task ID: ${taskId}:`, this.progressStore[taskId]);
 
             do {
                 // Check if the task has been aborted

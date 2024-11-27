@@ -73,6 +73,14 @@ async function getTokens(code) {
 // Function to set tokens
 function setTokens(tokens) {
     oauth2Client.setCredentials(tokens);
+    // Save tokens to disk
+    fs.writeFile(TOKEN_PATH, JSON.stringify(tokens), (err) => {
+        if (err) {
+            logger.error('Error saving tokens to file:', err);
+        } else {
+            logger.debug('Tokens saved to file:', TOKEN_PATH);
+        }
+    });
 }
 
 // Function to check authentication status
@@ -89,16 +97,28 @@ function getOAuth2Client() {
 // Add this function to clear credentials
 async function clearCredentials() {
     try {
-        // Remove stored token file if it exists
+        const fs = require('fs').promises;
         await fs.unlink(TOKEN_PATH);
-        // Reset OAuth2 client credentials
-        oauth2Client.setCredentials({});
-        logger.info('Credentials cleared successfully.');
-    } catch (error) {
-        logger.error('Error clearing credentials:', error);
-        throw error;
+        console.log('Credentials cleared successfully.');
+    } catch (err) {
+        console.error('Error unlinking credentials:', err);
+        // Handle the error appropriately
     }
 }
+
+// Load tokens from disk if available
+async function loadTokens() {
+    try {
+        const data = await fs.promises.readFile(TOKEN_PATH, 'utf8');
+        const tokens = JSON.parse(data);
+        setTokens(tokens);
+        logger.debug('Tokens loaded from file and set to OAuth2 client.');
+    } catch (err) {
+        logger.warn('No tokens found, user needs to authenticate.');
+    }
+}
+
+loadTokens();
 
 // Export necessary functions and redirectUri
 module.exports = {

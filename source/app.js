@@ -6,6 +6,7 @@ const authService = require('./services/gmailAuthService');
 const cookieParser = require('cookie-parser');
 const favicon = require('serve-favicon');
 const compression = require('compression');
+const cors = require('cors');
 
 // Load environment variables
 require('dotenv').config();
@@ -32,6 +33,12 @@ app.use(requestLogger);
 // Compress responses
 app.use(compression());
 
+// Enable CORS for frontend running on localhost:3000
+app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true
+}));
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const dataRoutes = require('./routes/dataRoutes');
@@ -43,8 +50,7 @@ app.use(dataRoutes);
 app.use(applicationRoutes);
 app.use(tokenRoutes);
 
-
-// Routes
+// Main Route
 app.get('/', async (req, res) => {
     try {
         const isAuthenticated = authService.isAuthenticated();
@@ -55,18 +61,7 @@ app.get('/', async (req, res) => {
     }
 });
 
-
-// Update the revoke route
-
-
-// Route to delete stored email data
-
-
-
-// Ensure that serve-favicon middleware is correctly positioned before other routes
-app.use(favicon(path.join(__dirname, 'static', 'images', 'email.png')));
-
-// 1. Define the /health endpoint with a proper response
+// Health Check Route
 app.get('/health', (req, res) => {
     console.log('Health check route accessed');
     res.status(200).json({
@@ -76,8 +71,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// 3. Ensure error handlers are at the end of the file
-// Move these to the very end, after all other route definitions
+// Error Handlers (should be at the end)
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Something broke!');
@@ -89,6 +83,7 @@ app.use((req, res) => {
 
 module.exports = app;
 
+// Start Server in Development
 if (process.env.NODE_ENV === 'development') {
     const port = process.env.PORT || 3000;
     app.listen(port, () => {

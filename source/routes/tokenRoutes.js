@@ -4,6 +4,8 @@ const authService = require("../services/gmailAuthService");
 const { clearCredentials } = require("../services/gmailAuthService");
 const gmailFetchService = require('../services/gmailFetchService');
 const logger = require('../services/logger');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 
@@ -68,6 +70,14 @@ router.post('/revoke', async (req, res) => {
 
         // Clear credentials from the OAuth client
         await clearCredentials();
+
+        // Delete the token file
+        try {
+            await fs.promises.unlink(path.join(__dirname, '../tokens/token.json'));
+            logger.debug('Token file deleted successfully.');
+        } catch (fileError) {
+            logger.warn('Warning: Failed to delete token file:', fileError);
+        }
 
         res.status(200).json({
             success: true,

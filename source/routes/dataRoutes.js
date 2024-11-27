@@ -41,10 +41,13 @@ router.post('/fetch_emails', async (req, res) => {
 
 router.get('/fetch_progress/:taskId', async (req, res) => {
     const { taskId } = req.params;
+    logger.debug(`Received fetch_progress request for Task ID: ${taskId}`);
 
     const progress = GmailFetchService.getProgress(taskId);
+    logger.debug(`Progress retrieved for Task ID ${taskId}:`, progress);
 
     if (!progress) {
+        logger.warn(`Task ID: ${taskId} not found in progressStore`);
         return res.status(404).json({ error: 'Task ID not found.' });
     }
 
