@@ -19,8 +19,7 @@ router.post('/generate-application-chart', async (req, res) => {
 
         // Load and decrypt the email data
         console.log('Loading email data...');
-        const gmailFetchService = require('./services/gmailFetchService');
-        const resultsPath = path.join(__dirname, 'data/email_results.json');
+        const resultsPath = path.join(__dirname, '..', 'data', 'email_results.json');
 
         console.log('\n=== ATTEMPTING DECRYPTION ===');
         console.log('Reading from:', resultsPath);

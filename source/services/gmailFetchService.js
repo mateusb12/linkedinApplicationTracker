@@ -5,6 +5,8 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const { google } = require('googleapis');
 const authService = require('./gmailAuthService');
 const logger = require('./logger'); // Adjust the path if necessary
+const fs = require('fs');
+const MailEncryptionService = require('./gmailEncryptionService'); // Import the encryption service
 
 class GmailFetchService {
     constructor() {
@@ -213,6 +215,43 @@ class GmailFetchService {
     calculateETA(remainingSeconds) {
         const etaDate = new Date(Date.now() + remainingSeconds * 1000);
         return etaDate.toISOString();
+    }
+
+    /**
+     * Decrypts the entire email results from a given file.
+     * @param {string} filename - Path to the encrypted email results file.
+     * @returns {Promise<Array>} - Resolves to an array of decrypted email data.
+     */
+    async decryptEmailResults(filename) {
+        try {
+            const encryptedContent = await fs.promises.readFile(filename, 'utf-8');
+            const encryptedData = JSON.parse(encryptedContent);
+
+            const decryptedString = MailEncryptionService.decryptData(encryptedData);
+            const decryptedData = JSON.parse(decryptedString); // Now an array of email objects
+
+            return decryptedData;
+        } catch (error) {
+            logger.error('Error decrypting email results:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Encrypts and saves the email results to a given file.
+     * @param {string} filename - Path to the email results file.
+     * @param {Array} emails - Array of email data to encrypt and save.
+     * @returns {Promise<void>}
+     */
+    async encryptAndSaveEmailResults(filename, emails) {
+        try {
+            const encryptedData = MailEncryptionService.encryptData(JSON.stringify(emails));
+            await fs.promises.writeFile(filename, JSON.stringify(encryptedData));
+            logger.info('Email results encrypted and saved successfully.');
+        } catch (error) {
+            logger.error('Error encrypting and saving email results:', error);
+            throw error;
+        }
     }
 }
 
