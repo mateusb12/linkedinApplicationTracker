@@ -3,10 +3,8 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const winston = require('winston');
-const { OAuth2Client } = require('google-auth-library');
 
 const TOKEN_PATH = path.join(__dirname, '../tokens/token.json');
-const CREDENTIALS_PATH = path.join(__dirname, '../secrets/credentials.json');
 
 // Define OAuth 2.0 scopes with clear documentation
 const SCOPES = [
