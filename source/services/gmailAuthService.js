@@ -41,7 +41,8 @@ if (process.env.NODE_ENV === 'development') {
 require('dotenv').config();
 
 // Define REDIRECT_URI from environment variables
-const redirectUri = process.env.REDIRECT_URI;
+const rawRedirectUri = process.env.REDIRECT_URI;
+const redirectUri = rawRedirectUri.replace(/:\d+/, `:${process.env.PORT}`);
 if (!redirectUri) {
     throw new Error('REDIRECT_URI is not defined in environment variables');
 }
