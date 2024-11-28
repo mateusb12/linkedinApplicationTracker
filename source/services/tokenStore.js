@@ -1,47 +1,44 @@
-const fs = require('fs');
+// tokenStore.js
+const fs = require('fs').promises;
 const path = require('path');
-const logger = require('./logger');
+const logger = require('./logger'); // Assuming you have a logger module
 
-const tokenPath = path.join(__dirname, '../tokens/token.json');
+const TOKEN_PATH = path.join(__dirname, '../tokens/token.json');
 
-const getTokens = () => {
+async function saveTokens(tokens) {
     try {
-        if (!fs.existsSync(tokenPath)) {
-            logger.warn('Token file does not exist.');
-            return null;
-        }
-        const data = fs.readFileSync(tokenPath, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        logger.error('Error reading tokens:', error);
-        return null;
+        await fs.writeFile(TOKEN_PATH, JSON.stringify(tokens));
+        logger.debug('Tokens saved to file:', TOKEN_PATH);
+    } catch (err) {
+        logger.error('Error saving tokens to file:', err);
+        throw err;
     }
-};
+}
 
-const setTokens = (tokens) => {
+async function loadTokens() {
     try {
-        fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
-        logger.info('Tokens saved successfully.');
-    } catch (error) {
-        logger.error('Error saving tokens:', error);
-        throw error;
+        const data = await fs.readFile(TOKEN_PATH, 'utf8');
+        const tokens = JSON.parse(data);
+        logger.debug('Tokens loaded from file:', TOKEN_PATH);
+        return tokens;
+    } catch (err) {
+        logger.warn('No tokens found, user needs to authenticate.');
+        throw err;
     }
-};
+}
 
-const clearTokens = () => {
+async function clearTokens() {
     try {
-        if (fs.existsSync(tokenPath)) {
-            fs.unlinkSync(tokenPath);
-            logger.info('Tokens cleared successfully.');
-        }
-    } catch (error) {
-        logger.error('Error clearing tokens:', error);
-        throw error;
+        await fs.unlink(TOKEN_PATH);
+        logger.debug('Tokens cleared successfully.');
+    } catch (err) {
+        logger.error('Error clearing tokens:', err);
+        throw err;
     }
-};
+}
 
 module.exports = {
-    getTokens,
-    setTokens,
-    clearTokens
-}; 
+    saveTokens,
+    loadTokens,
+    clearTokens,
+};

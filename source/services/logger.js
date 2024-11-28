@@ -1,5 +1,6 @@
 const { createLogger, format, transports } = require('winston');
 const path = require('path');
+const fs = require('fs');
 
 // Determine the environment
 const isProduction = process.env.NODE_ENV === 'production';

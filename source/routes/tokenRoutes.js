@@ -1,17 +1,12 @@
-// routes/tokenRoutes.js
+// tokenRoutes.js
 const express = require('express');
 const authService = require("../services/gmailAuthService");
-const { clearCredentials } = require("../services/gmailAuthService");
 const gmailFetchService = require('../services/gmailFetchService');
 const logger = require('../services/logger');
-const fs = require('fs');
-const path = require('path');
-
 const router = express.Router();
 
-
 // Move this BEFORE any error handlers and catch-all routes
-router.post('/set-tokens', express.json(), (req, res) => {
+router.post('/set-tokens', express.json(), async (req, res) => {
     try {
         console.log('Received token setting request');
 
@@ -24,7 +19,7 @@ router.post('/set-tokens', express.json(), (req, res) => {
         }
 
         console.log('Setting tokens in auth service');
-        authService.setTokens(req.body);
+        await authService.setTokens(req.body);
 
         // Verify the tokens were set correctly
         if (!authService.isAuthenticated()) {
@@ -69,15 +64,7 @@ router.post('/revoke', async (req, res) => {
         }
 
         // Clear credentials from the OAuth client
-        await clearCredentials();
-
-        // Delete the token file
-        try {
-            await fs.promises.unlink(path.join(__dirname, '../tokens/token.json'));
-            logger.debug('Token file deleted successfully.');
-        } catch (fileError) {
-            logger.warn('Warning: Failed to delete token file:', fileError);
-        }
+        await authService.clearCredentials();
 
         res.status(200).json({
             success: true,
@@ -130,5 +117,4 @@ router.post('/stop_fetch', express.json(), (req, res) => {
     }
 });
 
-module.exports = router
-
+module.exports = router;
