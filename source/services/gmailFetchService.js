@@ -17,19 +17,7 @@ if (Buffer.from(key).length !== 32) {
     throw new Error('Encryption key must be 32 bytes (256 bits) long for aes-256-cbc.');
 }
 
-const winston = require('winston');
-
-const logger = winston.createLogger({
-    level: 'debug',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
-    transports: [
-        new winston.transports.File({ filename: 'logs/error.log' }),
-        new winston.transports.Console()
-    ],
-});
+const logger = require('./logger'); // Adjust the path if necessary
 
 const { v4: uuidv4 } = require('uuid'); // Add UUID for unique task IDs
 
@@ -75,22 +63,22 @@ class GmailFetchService {
      */
     async fetchEmails(taskId, amount) {
         try {
-            logger.debug(`[${new Date().toISOString()}] Starting fetchEmails for Task ID: ${taskId}`);
+            logger.info(`Starting fetchEmails for Task ID: ${taskId}`);
             amount = amount || Number.MAX_SAFE_INTEGER;
 
             const auth = authService.getOAuth2Client();
             if (!auth) {
-                logger.error(`[${new Date().toISOString()}] OAuth2Client is not initialized for Task ID: ${taskId}`);
+                logger.error(`OAuth2Client is not initialized for Task ID: ${taskId}`);
                 this.progressStore[taskId].status = 'error';
                 this.progressStore[taskId].error = 'OAuth2Client is not initialized.';
                 return;
             }
 
             const credentials = auth.credentials;
-            logger.debug(`[${new Date().toISOString()}] Current OAuth2Client credentials for Task ID ${taskId}: ${JSON.stringify(credentials)}`);
+            logger.info(`Current OAuth2Client credentials for Task ID ${taskId}: ${JSON.stringify(credentials)}`);
 
             if (!credentials || !credentials.access_token) {
-                logger.error(`[${new Date().toISOString()}] OAuth2Client lacks valid credentials for Task ID: ${taskId}`);
+                logger.error(`OAuth2Client lacks valid credentials for Task ID: ${taskId}`);
                 this.progressStore[taskId].status = 'error';
                 this.progressStore[taskId].error = 'OAuth2Client lacks valid credentials.';
                 return;
@@ -102,7 +90,7 @@ class GmailFetchService {
             let nextPageToken = null;
             let totalEmails = amount;
 
-            logger.debug(`[${new Date().toISOString()}] Listing messages from jobs-noreply@linkedin.com for Task ID: ${taskId}`);
+            logger.info(`Listing messages from jobs-noreply@linkedin.com for Task ID: ${taskId}`);
             const initialResponse = await gmail.users.messages.list({
                 userId: 'me',
                 q: 'from:jobs-noreply@linkedin.com',
@@ -112,9 +100,9 @@ class GmailFetchService {
             if (initialResponse.data.resultSizeEstimate !== undefined) {
                 totalEmails = Math.min(amount, initialResponse.data.resultSizeEstimate);
                 this.progressStore[taskId].total = totalEmails;
-                logger.debug(`[${new Date().toISOString()}] Total emails to fetch for Task ID ${taskId}: ${totalEmails}`);
+                logger.info(`Total emails to fetch for Task ID ${taskId}: ${totalEmails}`);
             } else {
-                logger.warn(`[${new Date().toISOString()}] resultSizeEstimate is undefined for Task ID ${taskId}. Proceeding with the requested amount.`);
+                logger.warn(`resultSizeEstimate is undefined for Task ID ${taskId}. Proceeding with the requested amount.`);
                 this.progressStore[taskId].total = amount;
             }
 
@@ -122,17 +110,17 @@ class GmailFetchService {
             this.abortControllers[taskId] = abortController;
 
             // After initializing progressStore
-            logger.debug(`[${new Date().toISOString()}] Initialized progressStore for Task ID: ${taskId}:`, this.progressStore[taskId]);
+            logger.info(`Initialized progressStore for Task ID: ${taskId}:`, this.progressStore[taskId]);
 
             do {
                 // Check if the task has been aborted
                 if (this.taskStatus[taskId] === 'aborted') {
-                    logger.info(`[${new Date().toISOString()}] Fetch task ${taskId} has been aborted. Stopping fetch.`);
+                    logger.info(`Fetch task ${taskId} has been aborted. Stopping fetch.`);
                     break;
                 }
 
                 const maxResults = Math.min(500, amount - processed);
-                logger.debug(`[${new Date().toISOString()}] Fetching ${maxResults} messages (Processed: ${processed}/${totalEmails}) for Task ID: ${taskId}`);
+                logger.info(`Fetching ${maxResults} messages (Processed: ${processed}/${totalEmails}) for Task ID: ${taskId}`);
 
                 const response = await this.fetchWithRetry(() => gmail.users.messages.list({
                     userId: 'me',
@@ -142,12 +130,12 @@ class GmailFetchService {
                 }), abortController.signal);
 
                 if (abortController.signal.aborted || this.taskStatus[taskId] === 'aborted') {
-                    logger.info(`[${new Date().toISOString()}] Fetch task ${taskId} has been aborted during message listing.`);
+                    logger.info(`Fetch task ${taskId} has been aborted during message listing.`);
                     break;
                 }
 
                 if (!response || !response.data) {
-                    logger.error(`[${new Date().toISOString()}] No data received from messages.list for Task ID: ${taskId}`);
+                    logger.error(`No data received from messages.list for Task ID: ${taskId}`);
                     this.progressStore[taskId].status = 'error';
                     this.progressStore[taskId].error = 'Failed to retrieve messages.';
                     return;
@@ -156,12 +144,12 @@ class GmailFetchService {
                 const messages = response.data.messages || [];
                 nextPageToken = response.data.nextPageToken;
 
-                logger.debug(`[${new Date().toISOString()}] Fetched ${messages.length} messages for Task ID: ${taskId}.`);
+                logger.info(`Fetched ${messages.length} messages for Task ID: ${taskId}.`);
 
                 for (const message of messages) {
                     // Each iteration, check if the task has been aborted
                     if (this.taskStatus[taskId] === 'aborted') {
-                        logger.info(`[${new Date().toISOString()}] Fetch task ${taskId} has been aborted during message processing.`);
+                        logger.info(`Fetch task ${taskId} has been aborted during message processing.`);
                         break;
                     }
 
@@ -188,7 +176,7 @@ class GmailFetchService {
                         const remainingTime = this.formatTime(remainingSeconds);
                         const eta = this.calculateETA(remainingSeconds);
 
-                        logger.debug(`[${new Date().toISOString()}] Yielding progress: Processed ${processed}/${totalEmails} for Task ID: ${taskId}`);
+                        logger.info(`Yielding progress: Processed ${processed}/${totalEmails} for Task ID: ${taskId}`);
 
                         // Update progress
                         this.progressStore[taskId].current_speed = currentSpeed || 0;
@@ -197,11 +185,11 @@ class GmailFetchService {
                         this.progressStore[taskId].eta_formatted = eta;
 
                         if (processed >= amount) {
-                            logger.debug(`[${new Date().toISOString()}] Reached the requested amount of emails to fetch for Task ID: ${taskId}.`);
+                            logger.info(`Reached the requested amount of emails to fetch for Task ID: ${taskId}.`);
                             break;
                         }
                     } catch (msgError) {
-                        logger.error(`[${new Date().toISOString()}] Error fetching message ID ${message.id} for Task ID ${taskId}: ${msgError}`);
+                        logger.error(`Error fetching message ID ${message.id} for Task ID ${taskId}: ${msgError}`);
                         // Optionally, continue fetching other messages
                     }
                 }
@@ -228,27 +216,27 @@ class GmailFetchService {
             try {
                 await fs.mkdir(path.dirname(resultsPath), { recursive: true });
                 await fs.writeFile(resultsPath, JSON.stringify(encryptedData, null, 2));
-                logger.debug(`[${new Date().toISOString()}] Successfully saved encrypted email results to ${resultsPath}`);
+                logger.info(`Successfully saved encrypted email results to ${resultsPath}`);
             } catch (fileError) {
-                logger.error(`[${new Date().toISOString()}] Error saving email results file for Task ID ${taskId}:`, fileError);
+                logger.error(`Error saving email results file for Task ID ${taskId}:`, fileError);
                 this.progressStore[taskId].status = 'error';
                 this.progressStore[taskId].error = 'Failed to save email results.';
                 throw fileError;
             }
 
             if (this.taskStatus[taskId] === 'aborted') {
-                logger.info(`[${new Date().toISOString()}] Fetch task ${taskId} was aborted.`);
+                logger.info(`Fetch task ${taskId} was aborted.`);
                 this.progressStore[taskId].status = 'aborted';
             } else {
-                logger.debug(`[${new Date().toISOString()}] Fetching completed for Task ID: ${taskId}.`);
+                logger.info(`Fetching completed for Task ID: ${taskId}.`);
                 this.progressStore[taskId].status = 'completed';
             }
         } catch (error) {
             if (error.name === 'AbortError') {
-                logger.info(`[${new Date().toISOString()}] Fetch aborted for Task ID: ${taskId}`);
+                logger.info(`Fetch aborted for Task ID: ${taskId}`);
                 this.progressStore[taskId].status = 'aborted';
             } else {
-                logger.error(`[${new Date().toISOString()}] An error occurred in fetchEmails for Task ID ${taskId}:`, error);
+                logger.error(`An error occurred in fetchEmails for Task ID ${taskId}:`, error);
                 this.progressStore[taskId].status = 'error';
                 this.progressStore[taskId].error = error.message || 'An unknown error occurred.';
             }
@@ -286,7 +274,7 @@ class GmailFetchService {
                     throw error;
                 }
                 const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
-                logger.warn(`[${new Date().toISOString()}] Retry attempt ${attempt} after error: ${error.message}. Waiting for ${delay}ms.`);
+                logger.warn(`Retry attempt ${attempt} after error: ${error.message}. Waiting for ${delay}ms.`);
                 await new Promise(res => setTimeout(res, delay));
             }
         }
@@ -327,7 +315,7 @@ class GmailFetchService {
             if (abortController) {
                 abortController.abort();
             }
-            logger.debug(`[${new Date().toISOString()}] Fetch task ${taskId} marked as aborted.`);
+            logger.info(`Fetch task ${taskId} marked as aborted.`);
             return true;
         }
         return false;
