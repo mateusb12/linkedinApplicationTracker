@@ -1,37 +1,49 @@
 // routes/dataRoutes.js
-const express = require('express')
+const express = require('express');
 const authService = require("../services/gmailAuthService");
 const fetchMetadataService = require("../services/fetchMetadataService");
 const compression = require("compression");
-const GmailFetchService = require("../services/gmailFetchService");
 const fs = require("fs");
 const path = require("path");
 const logger = require('../services/logger');
+const { v4: uuidv4 } = require('uuid'); // Import UUID generator
+const TaskManagerService = require('../services/TaskManagerService'); // Import TaskManagerService
 
 const router = express.Router();
 
-
-router.get('/fetch-metadata', async (req, res) => {
+// Middleware to check authentication
+const ensureAuthenticated = (req, res, next) => {
     if (!authService.isAuthenticated()) {
         return res.status(401).json({ error: 'Not authenticated' });
     }
+    next();
+};
 
-    res.socket.setNoDelay(true);
+router.use(compression());
 
-    const metadata = await fetchMetadataService.getMetadata();
-    res.json(metadata);
+// Route to fetch metadata
+router.get('/fetch-metadata', ensureAuthenticated, async (req, res) => {
+    try {
+        res.socket.setNoDelay(true);
+        const metadata = await fetchMetadataService.getMetadata();
+        res.json(metadata);
+    } catch (error) {
+        logger.error('Error fetching metadata:', error);
+        res.status(500).json({ error: 'Failed to fetch metadata.' });
+    }
 });
 
-
-router.post('/fetch_emails', async (req, res) => {
+// Route to start fetching emails
+router.post('/fetch_emails', ensureAuthenticated, express.json(), async (req, res) => {
     const { amount } = req.body; // Expecting JSON body with 'amount'
 
-    if (!authService.isAuthenticated()) {
-        return res.status(401).json({ error: 'Not authenticated' });
+    if (typeof amount !== 'number' || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid amount provided.' });
     }
 
     try {
-        const taskId = GmailFetchService.startFetching(amount);
+        const taskId = uuidv4(); // Generate a unique task ID
+        TaskManagerService.startTask(taskId, amount); // Start the task
         res.json({ taskId });
     } catch (error) {
         logger.error('Error starting email fetch:', error);
@@ -39,66 +51,72 @@ router.post('/fetch_emails', async (req, res) => {
     }
 });
 
-router.get('/fetch_progress/:taskId', async (req, res) => {
+// Route to get progress of a specific task
+router.get('/fetch_progress/:taskId', ensureAuthenticated, async (req, res) => {
     const { taskId } = req.params;
     logger.debug(`Received fetch_progress request for Task ID: ${taskId}`);
 
-    const progress = GmailFetchService.getProgress(taskId);
-    logger.debug(`Progress retrieved for Task ID ${taskId}:`, progress);
-
-    if (!progress) {
-        logger.warn(`Task ID: ${taskId} not found in progressStore`);
-        return res.status(404).json({ error: 'Task ID not found.' });
-    }
-
-    res.status(200).json({
-        processed: progress.processed,
-        total: progress.total,
-        current_speed: progress.current_speed,
-        remaining_emails: progress.remaining_emails,
-        eta_formatted: progress.eta_formatted,
-        status: progress.status,
-        error: progress.error
-    });
-});
-
-router.delete('/delete-data', async (req, res) => {
     try {
-        await fs.unlink(path.join(__dirname, 'data', 'email_results.json'));
-        res.send('Data deleted successfully.');
+        const progress = TaskManagerService.getTaskProgress(taskId);
+        logger.debug(`Progress retrieved for Task ID ${taskId}:`, progress);
+
+        if (!progress) {
+            logger.warn(`Task ID: ${taskId} not found in TaskManager`);
+            return res.status(404).json({ error: 'Task ID not found.' });
+        }
+
+        res.status(200).json({
+            processed: progress.processed,
+            total: progress.total,
+            current_speed: progress.current_speed,
+            remaining_emails: progress.remaining_emails,
+            eta_formatted: progress.eta_formatted,
+            status: progress.status,
+            error: progress.error
+        });
     } catch (error) {
-        logger.error('Error deleting data:', error);
-        res.status(500).send('Failed to delete data.');
+        logger.error(`Error retrieving progress for Task ID ${taskId}:`, error);
+        res.status(500).json({ error: 'Failed to retrieve task progress.' });
     }
 });
 
-router.post('/stop_fetch', express.json(), async (req, res) => {
+// Route to stop an ongoing fetch task
+router.post('/stop_fetch', ensureAuthenticated, express.json(), async (req, res) => {
     const { taskId } = req.body;
-
-    if (!authService.isAuthenticated()) {
-        return res.status(401).json({ error: 'Not authenticated' });
-    }
 
     if (!taskId) {
         return res.status(400).json({ error: 'Task ID is required.' });
     }
 
     try {
-        const success = GmailFetchService.stopFetching(taskId);
-        if (success) {
-            res.status(200).json({
-                success: true,
-                message: 'Fetch aborted successfully.'
-            });
-        } else {
-            res.status(400).json({
-                error: 'Invalid Task ID or no active fetch found for the provided Task ID.'
-            });
-        }
+        TaskManagerService.stopTask(taskId); // Stop the task
+        res.status(200).json({
+            success: true,
+            message: 'Fetch aborted successfully.'
+        });
     } catch (error) {
         logger.error('Error stopping email fetch:', error);
         res.status(500).json({ error: 'Failed to stop email fetching.' });
     }
 });
 
-module.exports = router
+// Route to delete persisted email data
+router.delete('/delete-data', ensureAuthenticated, async (req, res) => {
+    const resultsPath = path.join(__dirname, '..', 'data', 'email_results.json');
+
+    try {
+        if (fs.existsSync(resultsPath)) {
+            await fs.promises.unlink(resultsPath);
+            logger.info('Email results data deleted successfully.');
+            res.send('Data deleted successfully.');
+        } else {
+            logger.warn('Email results data file does not exist.');
+            res.status(404).send('Data file not found.');
+        }
+    } catch (error) {
+        logger.error('Error deleting data:', error);
+        res.status(500).send('Failed to delete data.');
+    }
+});
+
+module.exports = router;
