@@ -33,9 +33,11 @@ app.use(requestLogger);
 // Compress responses
 app.use(compression());
 
-// Enable CORS for frontend running on localhost:3000
+const frontendPort = process.env.PORT || 3000; // Default to 3000 if PORT is not set
+const frontendUrl = `http://localhost:${frontendPort}`;
+
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: frontendUrl,
     credentials: true
 }));
 
@@ -46,7 +48,7 @@ const applicationRoutes = require('./routes/applicationRoutes');
 const tokenRoutes = require('./routes/tokenRoutes');
 
 app.use(authRoutes);
-app.use(dataRoutes);
+app.use('/data', dataRoutes);
 app.use(applicationRoutes);
 app.use(tokenRoutes);
 
@@ -54,10 +56,16 @@ app.use(tokenRoutes);
 app.get('/', async (req, res) => {
     try {
         const isAuthenticated = authService.isAuthenticated();
-        res.render('index', { authenticated: isAuthenticated });
+        res.render('index', { 
+            authenticated: isAuthenticated,
+            backendUrl: process.env.BACKEND_URL || '/data'
+        });
     } catch (error) {
         logger.error('Error checking authentication status:', error);
-        res.render('index', { authenticated: false });
+        res.render('index', { 
+            authenticated: false,
+            backendUrl: process.env.BACKEND_URL || '/data'
+        });
     }
 });
 
@@ -84,9 +92,14 @@ app.use((req, res) => {
 module.exports = app;
 
 // Start Server in Development
-if (process.env.NODE_ENV === 'development') {
-    const port = process.env.PORT || 3000;
-    app.listen(port, () => {
-        console.log(`Server running at http://localhost:${port}`);
+module.exports = app;
+
+// Determine if the app is running under Vercel
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV === 'development';
+
+// Start Server Locally (Not Under Vercel)
+if (process.env.NODE_ENV === 'development' && !isVercel) {
+    app.listen(frontendPort, () => {
+        console.log(`Server running at http://localhost:${frontendPort}`);
     });
 }

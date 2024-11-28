@@ -160,7 +160,7 @@ window.updateAuthUI = function (isAuthenticated) {
 window.startEmailFetch = async function (amount) {
     console.log('Attempting to start fetching emails with amount:', amount);
     try {
-        const response = await fetch('/fetch_emails', {
+        const response = await fetch(`${window.BACKEND_URL}/fetch_emails`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -186,70 +186,28 @@ window.startEmailFetch = async function (amount) {
 };
 
 window.pollFetchProgress = function (taskId, elements) {
-    const backendUrl = 'http://localhost:3000';
-    
+    const backendUrl = window.BACKEND_URL || '/data';
+
     const progressInterval = setInterval(async () => {
         try {
             const progressResponse = await fetch(`${backendUrl}/fetch_progress/${taskId}`);
             if (!progressResponse.ok) {
-                throw new Error('Failed to fetch progress.');
+                throw new Error(`Failed to fetch progress: server responded with status ${progressResponse.status}`);
             }
 
             const progressData = await progressResponse.json();
 
             if (progressData.error) {
-                throw new Error(progressData.error);
+                throw new Error(`Error from server: ${progressData.error}`);
             }
 
             window.updateProgressUI(progressData, elements);
-
             window.handleFetchStatus(progressData, progressInterval, elements);
         } catch (error) {
             console.error('Error fetching progress:', error);
             clearInterval(progressInterval);
             window.resetFetchUI();
-            alert('An error occurred while fetching emails.');
+            alert(`An error occurred while fetching progress: ${error.message}`);
         }
     }, 1000); // Poll every 1 second
 };
-
-async function checkAuthStatus() {
-    // Replace with your backend URL
-    const backendUrl = 'http://localhost:3000';
-    
-    // ...
-
-    const response = await fetch(`${backendUrl}/verify-auth`);
-    
-    // ... rest of the function ...
-}
-
-async function fetchEmails() {
-    // Replace with your backend URL
-    const backendUrl = 'http://localhost:3000';
-    
-    // ...
-
-    const response = await fetch(`${backendUrl}/fetch_emails`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount }),
-    });
-
-    // ... rest of the function ...
-}
-
-async function pollFetchProgress(taskId, elements) {
-    const backendUrl = 'http://localhost:3000';
-    
-    const progressInterval = setInterval(async () => {
-        try {
-            const progressResponse = await fetch(`${backendUrl}/fetch_progress/${taskId}`);
-            // ... rest of the function ...
-        } catch (error) {
-            // ... error handling ...
-        }
-    }, 1000); // Poll every 1 second
-}
