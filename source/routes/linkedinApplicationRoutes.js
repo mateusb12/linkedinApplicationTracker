@@ -7,7 +7,7 @@ const gmailFetchService = require("../services/gmailFetchService");
 
 const router = express.Router();
 
-router.post('/generate-application-chart', async (req, res) => {
+router.post('/generate-linkedin-application-chart', async (req, res) => {
     if (!authService.isAuthenticated()) {
         return res.status(401).json({ error: 'Not authenticated' });
     }

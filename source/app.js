@@ -44,7 +44,7 @@ app.use(cors({
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const dataRoutes = require('./routes/dataRoutes');
-const applicationRoutes = require('./routes/applicationRoutes');
+const applicationRoutes = require('./routes/linkedinApplicationRoutes');
 const tokenRoutes = require('./routes/tokenRoutes');
 
 app.use(authRoutes);
