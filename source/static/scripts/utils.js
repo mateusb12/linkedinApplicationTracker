@@ -82,7 +82,17 @@ window.updateProgressUI = function (progressData, elements) {
         ? progressData.current_speed.toFixed(2)
         : '0';
     elements.remainingEmails.textContent = progressData.remaining_emails || 0;
-    elements.eta.textContent = progressData.eta_formatted || 'Calculating...';
+
+    if (progressData.eta_formatted) {
+        // Parse the ISO date string and format it
+        const etaDate = new Date(progressData.eta_formatted);
+        elements.eta.textContent = etaDate.toLocaleTimeString('en-GB', { hour12: false });
+    } else if (progressData.eta_seconds !== undefined) {
+        // Use your existing function if eta in seconds is available
+        elements.eta.textContent = window.formatCurrentTimePlusSeconds(progressData.eta_seconds);
+    } else {
+        elements.eta.textContent = 'Calculating...';
+    }
 };
 
 window.handleFetchStatus = function (progressData, progressInterval, elements) {

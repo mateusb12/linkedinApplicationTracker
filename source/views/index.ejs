@@ -652,11 +652,11 @@
         }
     }
 
-    // function formatCurrentTimePlusSeconds(seconds) {
-    //     const now = new Date();
-    //     const etaDate = new Date(now.getTime() + (seconds * 1000));
-    //     return etaDate.toLocaleTimeString('en-GB', { hour12: false });
-    // }
+    function formatCurrentTimePlusSeconds(seconds) {
+        const now = new Date();
+        const etaDate = new Date(now.getTime() + (seconds * 1000));
+        return etaDate.toLocaleTimeString('en-GB', { hour12: false });
+    }
 
     async function generateApplicationChart() {
         const button = document.getElementById('generate-chart-button');
