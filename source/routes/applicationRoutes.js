@@ -53,7 +53,7 @@ router.post('/generate-application-chart', async (req, res) => {
 });
 
 router.get('/applications_chart.png', (req, res) => {
-    res.sendFile(path.join(__dirname, 'data', 'applications_chart.png'));
+    res.sendFile(path.join(__dirname, '..', 'data', 'applications_chart.png'));
 });
 
 module.exports = router

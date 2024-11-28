@@ -195,7 +195,8 @@ class ApplicationTrackingService {
         });
 
         const buffer = canvas.toBuffer('image/png');
-        await fs.writeFile(path.join(__dirname, '..', '..', 'applications_chart.png'), buffer);
+        await fs.writeFile(path.join(__dirname, '..', 'data', 'applications_chart.png'), buffer);
+        console.log("success!")
     }
 }
 
