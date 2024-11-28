@@ -91,14 +91,12 @@ app.use((req, res) => {
 
 module.exports = app;
 
-// Start Server in Development
-module.exports = app;
-
 // Determine if the app is running under Vercel
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV === 'development';
 
 // Start Server Locally (Not Under Vercel)
 if (process.env.NODE_ENV === 'development' && !isVercel) {
+    const frontendPort = process.env.PORT || 3001; // Changed default port to 3001
     app.listen(frontendPort, () => {
         console.log(`Server running at http://localhost:${frontendPort}`);
     });
