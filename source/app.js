@@ -15,7 +15,7 @@ require('dotenv').config();
 const app = express();
 
 // Set up view engine and static files
-app.set('views', path.join(__dirname, 'views'));
+app.set('views', path.join(__dirname, 'frameworks_and_drivers', 'views'));
 app.set('view engine', 'ejs');
 app.use('/static', express.static(path.join(__dirname, 'frameworks_and_drivers', 'static')));
 app.use(express.static(path.join(__dirname, 'frameworks_and_drivers', 'static')));
