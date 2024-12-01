@@ -1,5 +1,5 @@
 const express = require('express');
-const authService = require('../../../application/services/gmailAuthService');
+const authService = require('../../application/services/gmailAuthService');
 const crypto = require('crypto');
 
 const router = express.Router();

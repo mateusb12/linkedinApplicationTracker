@@ -1,9 +1,9 @@
 // routes/applicationRoutes.js
 const express = require('express')
-const authService = require("../../../application/services/gmailAuthService");
-const ApplicationTrackingService = require("../../../application/services/applicationTrackingService");
+const authService = require("../../application/services/gmailAuthService");
+const ApplicationTrackingService = require("../../application/services/applicationTrackingService");
 const path = require("path");
-const gmailFetchService = require("../../../application/services/gmailFetchService");
+const gmailFetchService = require("../../application/services/gmailFetchService");
 
 const router = express.Router();
 

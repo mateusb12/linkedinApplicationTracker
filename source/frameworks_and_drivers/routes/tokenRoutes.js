@@ -1,8 +1,8 @@
 // tokenRoutes.js
 const express = require('express');
-const authService = require("../../../application/services/gmailAuthService");
-const gmailFetchService = require('../../../application/services/gmailFetchService');
-const logger = require('../../../application/services/logger');
+const authService = require("../../application/services/gmailAuthService");
+const gmailFetchService = require('../../application/services/gmailFetchService');
+const logger = require('../../application/services/logger');
 const router = express.Router();
 
 // Move this BEFORE any error handlers and catch-all routes

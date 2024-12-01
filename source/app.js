@@ -42,10 +42,10 @@ app.use(cors({
 }));
 
 // Routes
-const authRoutes = require('./frameworks_and_drivers/web/routes/authRoutes');
-const dataRoutes = require('./frameworks_and_drivers/web/routes/dataRoutes');
-const applicationRoutes = require('./frameworks_and_drivers/web/routes/linkedinApplicationRoutes');
-const tokenRoutes = require('./frameworks_and_drivers/web/routes/tokenRoutes');
+const authRoutes = require('./frameworks_and_drivers/routes/authRoutes');
+const dataRoutes = require('./frameworks_and_drivers/routes/dataRoutes');
+const applicationRoutes = require('./frameworks_and_drivers/routes/linkedinApplicationRoutes');
+const tokenRoutes = require('./frameworks_and_drivers/routes/tokenRoutes');
 
 app.use(authRoutes);
 app.use('/data', dataRoutes);
