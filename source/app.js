@@ -17,9 +17,9 @@ const app = express();
 // Set up view engine and static files
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
-app.use('/static', express.static(path.join(__dirname, 'static')));
-app.use(express.static(path.join(__dirname, 'static')));
-app.use(favicon(path.join(__dirname, 'static', 'images', 'email.png')));
+app.use('/static', express.static(path.join(__dirname, 'frameworks_and_drivers', 'static')));
+app.use(express.static(path.join(__dirname, 'frameworks_and_drivers', 'static')));
+app.use(favicon(path.join(__dirname, 'frameworks_and_drivers', 'static', 'images', 'email.png')));
 
 // Parse incoming requests
 app.use(express.json());
