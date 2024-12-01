@@ -1,0 +1,1 @@
+# Implement use cases that coordinate between domain entities and interface adapters.

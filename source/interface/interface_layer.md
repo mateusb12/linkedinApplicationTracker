@@ -1,0 +1,1 @@
+# Adapt data between the application and external layer

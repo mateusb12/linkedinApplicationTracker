@@ -3,7 +3,7 @@ const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
 const winston = require('winston');
-const tokenStore = require('./tokenStore'); // Import the tokenStore module
+const tokenStore = require('../../infrastructure/external_services/token_registry/tokenStore'); // Import the tokenStore module
 
 // Define OAuth 2.0 scopes with clear documentation
 const SCOPES = [

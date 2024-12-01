@@ -1,4 +1,4 @@
-const GmailAuthService = require('../../source/services/gmailAuthService');
+const GmailAuthService = require('../../source/application/services/gmailAuthService');
 const { expect } = require('chai');
 const sinon = require('sinon');
 const fs = require('fs');

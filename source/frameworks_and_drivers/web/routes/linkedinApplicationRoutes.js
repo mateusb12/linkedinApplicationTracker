@@ -1,9 +1,9 @@
 // routes/applicationRoutes.js
 const express = require('express')
-const authService = require("../services/gmailAuthService");
-const ApplicationTrackingService = require("../services/applicationTrackingService");
+const authService = require("../../../application/services/gmailAuthService");
+const ApplicationTrackingService = require("../../../application/services/applicationTrackingService");
 const path = require("path");
-const gmailFetchService = require("../services/gmailFetchService");
+const gmailFetchService = require("../../../application/services/gmailFetchService");
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.post('/generate-linkedin-application-chart', async (req, res) => {
 
         // Load and decrypt the email data
         console.log('Loading email data...');
-        const resultsPath = path.join(__dirname, '..', 'data', 'email_results.json');
+        const resultsPath = path.join(__dirname, '..', '..', '..', 'application', 'data', 'email_results.json');
 
         console.log('\n=== ATTEMPTING DECRYPTION ===');
         console.log('Reading from:', resultsPath);
@@ -53,7 +53,7 @@ router.post('/generate-linkedin-application-chart', async (req, res) => {
 });
 
 router.get('/applications_chart.png', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'data', 'applications_chart.png'));
+    res.sendFile(path.join(__dirname, '..', '..', '..', 'application', 'data', 'applications_chart.png'));
 });
 
 module.exports = router

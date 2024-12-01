@@ -22,3 +22,8 @@
 /node_modules/
 /.next/
 /source/data/applications_chart.png
+/source/infrastructure/external_services/core_scrapper/cookies.json
+/source/infrastructure/external_services/core_scrapper/test.ipynb
+/source/application/data/applications_chart.png
+/source/application/data/token.json
+/source/application/data/email_results.json

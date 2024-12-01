@@ -2,7 +2,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const authService = require('./services/gmailAuthService');
+const authService = require('./application/services/gmailAuthService');
 const cookieParser = require('cookie-parser');
 const favicon = require('serve-favicon');
 const compression = require('compression');
@@ -27,7 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Custom middleware
-const requestLogger = require('./middleware/requestLogger');
+const requestLogger = require('./infrastructure/middleware/requestLogger');
 app.use(requestLogger);
 
 // Compress responses
@@ -42,10 +42,10 @@ app.use(cors({
 }));
 
 // Routes
-const authRoutes = require('./routes/authRoutes');
-const dataRoutes = require('./routes/dataRoutes');
-const applicationRoutes = require('./routes/linkedinApplicationRoutes');
-const tokenRoutes = require('./routes/tokenRoutes');
+const authRoutes = require('./frameworks_and_drivers/web/routes/authRoutes');
+const dataRoutes = require('./frameworks_and_drivers/web/routes/dataRoutes');
+const applicationRoutes = require('./frameworks_and_drivers/web/routes/linkedinApplicationRoutes');
+const tokenRoutes = require('./frameworks_and_drivers/web/routes/tokenRoutes');
 
 app.use(authRoutes);
 app.use('/data', dataRoutes);

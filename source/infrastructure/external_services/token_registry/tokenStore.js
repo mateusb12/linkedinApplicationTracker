@@ -1,9 +1,9 @@
 // tokenStore.js
 const fs = require('fs').promises;
 const path = require('path');
-const logger = require('./logger'); // Assuming you have a logger module
+const logger = require('../../../application/services/logger'); // Assuming you have a logger module
 
-const TOKEN_PATH = path.join(__dirname, '../tokens/token.json');
+const TOKEN_PATH = path.join(__dirname, '../../../application/data/token.json');
 
 async function saveTokens(tokens) {
     try {

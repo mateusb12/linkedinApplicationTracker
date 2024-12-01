@@ -1,8 +1,7 @@
-from boltons.iterutils import first
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
-from source.core_scrapper.selenium_utils import open_chrome, export_cookies
+from source.core_scrapper import open_chrome, export_cookies
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 

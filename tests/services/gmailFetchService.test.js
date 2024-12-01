@@ -1,4 +1,4 @@
-const GmailFetchService = require('../../source/services/gmailFetchService');
+const GmailFetchService = require('../../source/application/services/gmailFetchService');
 const { expect } = require('chai');
 const sinon = require('sinon');
 

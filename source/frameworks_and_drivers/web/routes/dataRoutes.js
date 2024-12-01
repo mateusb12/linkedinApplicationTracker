@@ -1,13 +1,13 @@
 // routes/dataRoutes.js
 const express = require('express');
-const authService = require("../services/gmailAuthService");
-const fetchMetadataService = require("../services/fetchMetadataService");
+const authService = require("../../../application/services/gmailAuthService");
+const fetchMetadataService = require("../../../application/services/fetchMetadataService");
 const compression = require("compression");
 const fs = require("fs");
 const path = require("path");
-const logger = require('../services/logger');
+const logger = require('../../../application/services/logger');
 const { v4: uuidv4 } = require('uuid'); // Import UUID generator
-const TaskManagerService = require('../services/TaskManagerService'); // Import TaskManagerService
+const TaskManagerService = require('../../../application/services/taskManagerService'); // Import TaskManagerService
 
 const router = express.Router();
 
