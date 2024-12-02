@@ -1,6 +1,7 @@
 // services/gmailEncryptionService.js
 
 const crypto = require('crypto');
+const EncryptionService = require("../interface/IEncryptionLogic");
 const algorithm = 'aes-256-cbc';
 const key = process.env.ENCRYPTION_KEY;
 
@@ -12,8 +13,8 @@ if (Buffer.from(key).length !== 32) {
     throw new Error('Encryption key must be 32 bytes (256 bits) long for aes-256-cbc.');
 }
 
-class MailEncryptionService {
-    static encryptData(data) {
+class MailEncryptionService extends EncryptionService {
+    encryptData(data) {
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv(algorithm, Buffer.from(key), iv);
         let encrypted = cipher.update(data);
@@ -25,8 +26,7 @@ class MailEncryptionService {
         };
     }
 
-    // Optionally, provide a decryptData method if needed
-    static decryptData(encryptedData) {
+    decryptData(encryptedData) {
         const iv = Buffer.from(encryptedData.iv, 'base64');
         const encryptedText = Buffer.from(encryptedData.data, 'base64');
         const decipher = crypto.createDecipheriv(algorithm, Buffer.from(key), iv);

@@ -6,15 +6,16 @@ const { google } = require('googleapis');
 const authService = require('./gmailAuthService');
 const logger = require('./logger'); // Adjust the path if necessary
 const fs = require('fs');
-const MailEncryptionService = require('./gmailEncryptionService'); // Import the encryption service
 
 class GmailFetchService {
-    constructor() {
+    constructor(encryptionService, dataPersistenceService) {
         this.rateLimitConfig = {
             maxRetries: 5,
             baseDelay: 1000,
             maxDelay: 16000
         };
+        this.encryptionService = encryptionService;
+        this.dataPersistenceService = dataPersistenceService;
     }
 
     /**
@@ -224,13 +225,10 @@ class GmailFetchService {
      */
     async decryptEmailResults(filename) {
         try {
-            const encryptedContent = await fs.promises.readFile(filename, 'utf-8');
+            const encryptedContent = await this.dataPersistenceService.readFile(filename);
             const encryptedData = JSON.parse(encryptedContent);
-
-            const decryptedString = MailEncryptionService.decryptData(encryptedData);
-            const decryptedData = JSON.parse(decryptedString); // Now an array of email objects
-
-            return decryptedData;
+            const decryptedString = this.encryptionService.decryptData(encryptedData);
+            return JSON.parse(decryptedString);
         } catch (error) {
             logger.error('Error decrypting email results:', error);
             throw error;
@@ -245,8 +243,8 @@ class GmailFetchService {
      */
     async encryptAndSaveEmailResults(filename, emails) {
         try {
-            const encryptedData = MailEncryptionService.encryptData(JSON.stringify(emails));
-            await fs.promises.writeFile(filename, JSON.stringify(encryptedData));
+            const encryptedData = this.encryptionService.encryptData(JSON.stringify(emails));
+            await this.dataPersistenceService.writeFile(filename, JSON.stringify(encryptedData));
             logger.info('Email results encrypted and saved successfully.');
         } catch (error) {
             logger.error('Error encrypting and saving email results:', error);
@@ -255,4 +253,4 @@ class GmailFetchService {
     }
 }
 
-module.exports = new GmailFetchService();
+module.exports = GmailFetchService;

@@ -1,13 +1,16 @@
 // services/TaskManagerService.js
 
 const GmailFetchService = require('./gmailFetchService');
-const gmailEncryptionService = require('./gmailEncryptionService');
+const gmailEncryptionService = require('../../logic/gmailEncryptionService');
 const gmailDataPersistence = require('./gmailDataPersistence');
 const logger = require('./logger');
 const path = require('path');
 
 class TaskManagerService {
-    constructor() {
+    constructor(gmailFetchService, encryptionService, dataPersistenceService) {
+        this.gmailFetchService = gmailFetchService;
+        this.encryptionService = encryptionService;
+        this.dataPersistenceService = dataPersistenceService;
         this.tasks = {}; // Map taskId to task details
     }
 
@@ -37,7 +40,7 @@ class TaskManagerService {
 
         const taskPromise = (async () => {
             try {
-                const emails = await GmailFetchService.fetchEmails(
+                const emails = await this.gmailFetchService.fetchEmails(
                     taskId,
                     amount,
                     abortController.signal,
@@ -49,10 +52,9 @@ class TaskManagerService {
                 progress.status = 'completed';
 
                 // Encrypt and save data
-                const dataToEncrypt = JSON.stringify(emails);
-                const encryptedData = gmailEncryptionService.encryptData(dataToEncrypt);
+                const encryptedData = this.encryptionService.encryptData(JSON.stringify(emails));
                 const resultsPath = path.join(__dirname, '../data/email_results.json');
-                await gmailDataPersistence.saveData(encryptedData, resultsPath);
+                await this.dataPersistenceService.saveData(encryptedData, resultsPath);
 
                 logger.info(`Task ${taskId} completed successfully.`);
             } catch (error) {
@@ -105,4 +107,4 @@ class TaskManagerService {
     }
 }
 
-module.exports = new TaskManagerService();
+module.exports = TaskManagerService;

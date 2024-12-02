@@ -3,7 +3,7 @@ const express = require('express')
 const authService = require("../../application/services/gmailAuthService");
 const ApplicationTrackingService = require("../../application/services/applicationTrackingService");
 const path = require("path");
-const gmailFetchService = require("../../application/services/gmailFetchService");
+const gmailFetchInstance = require("../../application/factory/factory_instances");
 
 const router = express.Router();
 
@@ -25,7 +25,7 @@ router.post('/generate-linkedin-application-chart', async (req, res) => {
         console.log('Reading from:', resultsPath);
 
         try {
-            const decryptedData = await gmailFetchService.decryptEmailResults(resultsPath);
+            const decryptedData = await gmailFetchInstance.decryptEmailResults(resultsPath);
             console.log('\nDecryption successful!');
             console.log('Decrypted data type:', typeof decryptedData);
             console.log('Is array?:', Array.isArray(decryptedData));

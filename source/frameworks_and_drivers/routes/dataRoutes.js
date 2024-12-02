@@ -7,7 +7,9 @@ const fs = require("fs");
 const path = require("path");
 const logger = require('../../application/services/logger');
 const { v4: uuidv4 } = require('uuid'); // Import UUID generator
-const TaskManagerService = require('../../application/services/taskManagerService'); // Import TaskManagerService
+const TaskManagerInstance = require('../../application/factory/factory_instances'); // Import TaskManagerService
+
+
 
 const router = express.Router();
 
@@ -43,7 +45,7 @@ router.post('/fetch_emails', ensureAuthenticated, express.json(), async (req, re
 
     try {
         const taskId = uuidv4(); // Generate a unique task ID
-        TaskManagerService.startTask(taskId, amount); // Start the task
+        TaskManagerInstance.startTask(taskId, amount); // Start the task
         res.json({ taskId });
     } catch (error) {
         logger.error('Error starting email fetch:', error);
@@ -57,7 +59,7 @@ router.get('/fetch_progress/:taskId', ensureAuthenticated, async (req, res) => {
     logger.debug(`Received fetch_progress request for Task ID: ${taskId}`);
 
     try {
-        const progress = TaskManagerService.getTaskProgress(taskId);
+        const progress = TaskManagerInstance.getTaskProgress(taskId);
         logger.debug(`Progress retrieved for Task ID ${taskId}:`, progress);
 
         if (!progress) {
@@ -89,7 +91,7 @@ router.post('/stop_fetch', ensureAuthenticated, express.json(), async (req, res)
     }
 
     try {
-        TaskManagerService.stopTask(taskId); // Stop the task
+        TaskManagerInstance.stopTask(taskId); // Stop the task
         res.status(200).json({
             success: true,
             message: 'Fetch aborted successfully.'
