@@ -3,7 +3,7 @@ const express = require('express')
 const authService = require("../../application/services/gmailAuthService");
 const ApplicationTrackingService = require("../../application/services/applicationTrackingService");
 const path = require("path");
-const gmailFetchInstance = require("../../application/factory/factory_instances");
+const { gmailFetchInstance } = require("../../application/factory/factory_instances");
 
 const router = express.Router();
 

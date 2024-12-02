@@ -1,4 +1,4 @@
-// app.js or index.js
+// factory_instances.js
 
 // Instantiate the implementations of your interfaces
 const MailEncryptionService = require("../../logic/gmailEncryptionService");
