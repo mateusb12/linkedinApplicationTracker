@@ -1,6 +1,8 @@
 // services/TaskManagerService.js
 const logger = require('./logger');
 const path = require('path');
+const {tasks} = require("googleapis/build/src/apis/tasks");
+const {setKey, getKey} = require("../../external_services/redisService");
 
 class TaskManagerService {
     constructor(gmailFetchService, encryptionService, dataPersistenceService) {
@@ -8,10 +10,12 @@ class TaskManagerService {
         this.encryptionService = encryptionService;
         this.dataPersistenceService = dataPersistenceService;
         this.tasks = {}; // Map taskId to task details
+        this.abortControllers = {};
     }
 
-    startTask(taskId, amount) {
-        if (this.tasks[taskId]) {
+    async startTask(taskId, amount) {
+        const existingTask = tasks[taskId];
+        if (existingTask) {
             logger.warn(`Task with ID ${taskId} already exists.`);
             return;
         }
@@ -27,11 +31,17 @@ class TaskManagerService {
             eta_formatted: ''
         };
 
+        // Initialize task in Redis
+        await setKey(`task:${taskId}`, progress);
+
         const abortController = new AbortController();
         const startTime = Date.now();
 
-        const progressCallback = (update) => {
+        const progressCallback = async (update) => {
             Object.assign(progress, update);
+            const currentProgress = await getKey(`task:${taskId}`);
+            const updatedProgress = {...currentProgress, ...update};
+            await setKey(`task:${taskId}`, updatedProgress);
         };
 
         const taskPromise = (async () => {
@@ -40,7 +50,9 @@ class TaskManagerService {
                     taskId,
                     amount,
                     abortController.signal,
-                    progressCallback
+                    async (update) => {
+                        await progressCallback(update);
+                    }
                 );
 
                 progress.emails = emails;
@@ -55,15 +67,21 @@ class TaskManagerService {
                 logger.info(`Task ${taskId} completed successfully.`);
             } catch (error) {
                 if (error.message === 'Fetch aborted') {
+                    await progressCallback({ status: 'aborted' });
                     progress.status = 'aborted';
                     logger.info(`Task ${taskId} has been aborted.`);
                 } else {
+                    await progressCallback({ status: 'error', error: error.message })
                     progress.status = 'error';
                     progress.error = error.message;
                     logger.error(`Error in task ${taskId}:`, error);
                 }
+            } finally {
+                delete this.abortControllers[taskId];
             }
         })();
+
+        // Optionally, you can track taskPromise if needed
 
         this.tasks[taskId] = {
             progress,
@@ -78,14 +96,17 @@ class TaskManagerService {
             progress.status = 'aborted';
             abortController.abort();
             logger.info(`Task ${taskId} has been stopped.`);
+            return true;
         } else {
             logger.warn(`Task with ID ${taskId} does not exist.`);
+            return false;
         }
     }
 
     getTaskProgress(taskId) {
-        if (this.tasks[taskId]) {
-            return this.tasks[taskId].progress;
+        const existingTask = this.tasks[taskId]
+        if (existingTask) {
+            return existingTask.progress;
         } else {
             logger.warn(`Task with ID ${taskId} does not exist.`);
             return null;

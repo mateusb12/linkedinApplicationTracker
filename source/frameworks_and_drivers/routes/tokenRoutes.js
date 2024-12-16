@@ -3,6 +3,7 @@ const express = require('express');
 const authService = require("../../application/services/gmailAuthService");
 const gmailFetchService = require('../../application/services/gmailFetchService');
 const logger = require('../../application/services/logger');
+const {taskManagerInstance} = require("../../application/factory/factory_instances");
 const router = express.Router();
 
 // Move this BEFORE any error handlers and catch-all routes
@@ -103,7 +104,7 @@ router.post('/stop_fetch', express.json(), (req, res) => {
         });
     }
 
-    const success = gmailFetchService.stopFetching(taskId);
+    const success = taskManagerInstance.stopTask(taskId);
 
     if (success) {
         res.status(200).json({
