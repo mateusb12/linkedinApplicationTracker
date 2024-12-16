@@ -17,7 +17,7 @@ redis.on('error', (err) => console.log('Redis error:', err));
  * @returns {Promise<string>} - The result of the set operation.
  */
 const setKey = async (key, value) => {
-    return await redis.set(key, value);
+    return redis.set(key, value);
 };
 
 /**
@@ -26,11 +26,47 @@ const setKey = async (key, value) => {
  * @returns {Promise<string|null>} - The value associated with the key, or null if not found.
  */
 const getKey = async (key) => {
-    return await redis.get(key);
+    return redis.get(key);
+};
+
+/**
+ * Deletes a specific key from Redis.
+ * @param {string} key - The key to delete.
+ * @returns {Promise<number>} - The number of keys that were removed.
+ */
+const deleteKey = async (key) => {
+    return redis.del(key);
+};
+
+/**
+ * Clears all keys from the current Redis database.
+ * @returns {Promise<string>} - The result of the flush operation.
+ */
+const clearRedis = async () => {
+    return redis.flushdb();
+};
+
+/**
+ * Retrieves all keys from Redis using SCAN to avoid blocking.
+ * @param {number} [count=100] - The number of keys to retrieve per SCAN iteration.
+ * @returns {Promise<string[]>} - An array of all keys in Redis.
+ */
+const getAllKeys = async (count = 100) => {
+    let keys = [];
+    let cursor = '0';
+    do {
+        const reply = await redis.scan(cursor, 'COUNT', count);
+        cursor = reply[0];
+        keys = keys.concat(reply[1]);
+    } while (cursor !== '0');
+    return keys;
 };
 
 module.exports = {
     redis,
     setKey,
-    getKey
+    getKey,
+    deleteKey,
+    clearRedis,
+    getAllKeys
 };

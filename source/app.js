@@ -46,11 +46,13 @@ const authRoutes = require('./frameworks_and_drivers/routes/authRoutes');
 const dataRoutes = require('./frameworks_and_drivers/routes/dataRoutes');
 const applicationRoutes = require('./frameworks_and_drivers/routes/linkedinApplicationRoutes');
 const tokenRoutes = require('./frameworks_and_drivers/routes/tokenRoutes');
+const redisRoutes = require('./frameworks_and_drivers/routes/redisRoutes');
 
 app.use(authRoutes);
 app.use('/data', dataRoutes);
 app.use(applicationRoutes);
 app.use(tokenRoutes);
+app.use('/redis', redisRoutes);
 
 // Main Route
 app.get('/', async (req, res) => {

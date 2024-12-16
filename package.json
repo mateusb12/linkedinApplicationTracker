@@ -20,6 +20,7 @@
         "express-session": "^1.17.3",
         "express-sse": "^0.5.3",
         "googleapis": "^126.0.1",
+        "ioredis": "^5.4.1",
         "luxon": "^3.5.0",
         "serve-favicon": "^2.5.0",
         "winston": "^3.17.0"

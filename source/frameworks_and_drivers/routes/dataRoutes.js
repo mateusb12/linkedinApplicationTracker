@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const logger = require('../../application/services/logger');
 const { v4: uuidv4 } = require('uuid'); // Import UUID generator
-const TaskManagerInstance = require('../../application/factory/factory_instances'); // Import TaskManagerService
+const {taskManagerInstance} = require('../../application/factory/factory_instances'); // Import TaskManagerService
 
 
 
@@ -45,7 +45,7 @@ router.post('/fetch_emails', ensureAuthenticated, express.json(), async (req, re
 
     try {
         const taskId = uuidv4(); // Generate a unique task ID
-        TaskManagerInstance.startTask(taskId, amount); // Start the task
+        taskManagerInstance.startTask(taskId, amount); // Start the task
         res.json({ taskId });
     } catch (error) {
         logger.error('Error starting email fetch:', error);
@@ -59,7 +59,7 @@ router.get('/fetch_progress/:taskId', ensureAuthenticated, async (req, res) => {
     logger.debug(`Received fetch_progress request for Task ID: ${taskId}`);
 
     try {
-        const progress = TaskManagerInstance.getTaskProgress(taskId);
+        const progress = taskManagerInstance.getTaskProgress(taskId);
         logger.debug(`Progress retrieved for Task ID ${taskId}:`, progress);
 
         if (!progress) {
